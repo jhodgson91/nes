@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 paste = "0.1.6"
+bit_field = "0.10.0"

@@ -1,4 +1,5 @@
 mod address_modes;
+mod helpers;
 mod instructions;
 
 pub use instructions::Instruction;
@@ -6,8 +7,11 @@ pub use instructions::Instruction;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bit_field::BitField;
+
 use super::Bus;
 
+#[derive(Debug)]
 pub struct CPU {
     pc: u16, // program counter
     s: u8,   // stack ptr
@@ -16,22 +20,42 @@ pub struct CPU {
     a: u8,   // accumulator
     p: u8,   // status
 
+    oper: u16, // Operation for the current instruction
+
     instruction: Instruction,
 
     bus: Rc<RefCell<Bus>>,
 }
 
 impl CPU {
-    const INSTRUCTIONS: [[Instruction; 16]; 16] = [[Instruction::INVALID; 16]; 16];
+    const STACK: u16 = 0x0100;
+
+    // Flags
+    const C: usize = 0; // Carry
+    const Z: usize = 1; // Zero
+    const I: usize = 2; // Interrupt
+    const D: usize = 3; // Decimal
+    const B: usize = 4; // Break
+    const V: usize = 6; // Overflow
+    const N: usize = 7; // Negative
+
+    pub fn get_flag(&self, f: usize) -> bool {
+        self.p.get_bit(f)
+    }
+
+    pub fn set_flag(&mut self, f: usize, val: bool) {
+        self.p.set_bit(f, val);
+    }
 
     pub fn new(bus: Rc<RefCell<Bus>>, pc: u16) -> Self {
         CPU {
             pc,
-            s: 0,
             x: 0,
             y: 0,
             a: 0,
-            p: 0,
+            s: 0xFD,
+            p: 0x34,
+            oper: 0,
             instruction: Instruction::INVALID,
             bus,
         }
@@ -41,18 +65,18 @@ impl CPU {
     pub fn nmi() {}
     pub fn irq() {}
 
-    fn clock(&mut self) {
+    pub fn clock(&mut self) {
         if self.instruction.cycles == 0 {
             let op = self.bus.borrow().read_u8(self.pc);
             self.pc += 1;
             let (lower, upper) = ((op & 0x0f) as usize, (op >> 4) as usize);
 
             self.instruction = Self::INSTRUCTIONS[upper][lower];
-            let (addr, mut extra_cycles) = (self.instruction.addr_mode)(self);
-            extra_cycles += (self.instruction.op)(self, addr);
-            self.instruction.cycles += extra_cycles;
+
+            (self.instruction.addr_mode.method())(self);
+            (self.instruction.code.method())(self);
         }
 
-        self.instruction.cycles -= 1;
+        self.instruction.cycles = self.instruction.cycles.saturating_sub(1);
     }
 }

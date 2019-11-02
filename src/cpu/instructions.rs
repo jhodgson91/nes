@@ -4,7 +4,7 @@ use super::CPU;
 use bit_field::BitField;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum InstructionCode {
+pub enum Operation {
     ADC, //	....	add with carry
     AND, //	....	and (with accumulator)
     ASL, //	....	arithmetic shift left
@@ -64,338 +64,343 @@ pub enum InstructionCode {
     XXX, // ....    invalid code
 }
 
-impl InstructionCode {
+impl Operation {
     pub fn method(&self) -> impl Fn(&mut CPU) {
         match self {
-            InstructionCode::ADC => CPU::adc,
-            InstructionCode::AND => CPU::and,
-            InstructionCode::ASL => CPU::asl,
-            InstructionCode::BCC => CPU::bcc,
-            InstructionCode::BCS => CPU::bcs,
-            InstructionCode::BEQ => CPU::beq,
-            InstructionCode::BIT => CPU::bit,
-            InstructionCode::BMI => CPU::bmi,
-            InstructionCode::BNE => CPU::bne,
-            InstructionCode::BPL => CPU::bpl,
-            InstructionCode::BRK => CPU::brk,
-            InstructionCode::BVC => CPU::bvc,
-            InstructionCode::BVS => CPU::bvs,
-            InstructionCode::CLC => CPU::clc,
-            InstructionCode::CLD => CPU::cld,
-            InstructionCode::CLI => CPU::cli,
-            InstructionCode::CLV => CPU::clv,
-            InstructionCode::CMP => CPU::cmp,
-            InstructionCode::CPX => CPU::cpx,
-            InstructionCode::CPY => CPU::cpy,
-            InstructionCode::DEC => CPU::dec,
-            InstructionCode::DEX => CPU::dex,
-            InstructionCode::DEY => CPU::dey,
-            InstructionCode::EOR => CPU::eor,
-            InstructionCode::INC => CPU::inc,
-            InstructionCode::INX => CPU::inx,
-            InstructionCode::INY => CPU::iny,
-            InstructionCode::JMP => CPU::jmp,
-            InstructionCode::JSR => CPU::jsr,
-            InstructionCode::LDA => CPU::lda,
-            InstructionCode::LDX => CPU::ldx,
-            InstructionCode::LDY => CPU::ldy,
-            InstructionCode::LSR => CPU::lsr,
-            InstructionCode::NOP => CPU::nop,
-            InstructionCode::ORA => CPU::ora,
-            InstructionCode::PHA => CPU::pha,
-            InstructionCode::PHP => CPU::php,
-            InstructionCode::PLA => CPU::pla,
-            InstructionCode::PLP => CPU::plp,
-            InstructionCode::ROL => CPU::rol,
-            InstructionCode::ROR => CPU::ror,
-            InstructionCode::RTI => CPU::rti,
-            InstructionCode::RTS => CPU::rts,
-            InstructionCode::SBC => CPU::sbc,
-            InstructionCode::SEC => CPU::sec,
-            InstructionCode::SED => CPU::sed,
-            InstructionCode::SEI => CPU::sei,
-            InstructionCode::STA => CPU::sta,
-            InstructionCode::STX => CPU::stx,
-            InstructionCode::STY => CPU::sty,
-            InstructionCode::TAX => CPU::tax,
-            InstructionCode::TAY => CPU::tay,
-            InstructionCode::TSX => CPU::tsx,
-            InstructionCode::TXA => CPU::txa,
-            InstructionCode::TXS => CPU::txs,
-            InstructionCode::TYA => CPU::tya,
-            InstructionCode::XXX => CPU::xxx,
+            Operation::ADC => CPU::adc,
+            Operation::AND => CPU::and,
+            Operation::ASL => CPU::asl,
+            Operation::BCC => CPU::bcc,
+            Operation::BCS => CPU::bcs,
+            Operation::BEQ => CPU::beq,
+            Operation::BIT => CPU::bit,
+            Operation::BMI => CPU::bmi,
+            Operation::BNE => CPU::bne,
+            Operation::BPL => CPU::bpl,
+            Operation::BRK => CPU::brk,
+            Operation::BVC => CPU::bvc,
+            Operation::BVS => CPU::bvs,
+            Operation::CLC => CPU::clc,
+            Operation::CLD => CPU::cld,
+            Operation::CLI => CPU::cli,
+            Operation::CLV => CPU::clv,
+            Operation::CMP => CPU::cmp,
+            Operation::CPX => CPU::cpx,
+            Operation::CPY => CPU::cpy,
+            Operation::DEC => CPU::dec,
+            Operation::DEX => CPU::dex,
+            Operation::DEY => CPU::dey,
+            Operation::EOR => CPU::eor,
+            Operation::INC => CPU::inc,
+            Operation::INX => CPU::inx,
+            Operation::INY => CPU::iny,
+            Operation::JMP => CPU::jmp,
+            Operation::JSR => CPU::jsr,
+            Operation::LDA => CPU::lda,
+            Operation::LDX => CPU::ldx,
+            Operation::LDY => CPU::ldy,
+            Operation::LSR => CPU::lsr,
+            Operation::NOP => CPU::nop,
+            Operation::ORA => CPU::ora,
+            Operation::PHA => CPU::pha,
+            Operation::PHP => CPU::php,
+            Operation::PLA => CPU::pla,
+            Operation::PLP => CPU::plp,
+            Operation::ROL => CPU::rol,
+            Operation::ROR => CPU::ror,
+            Operation::RTI => CPU::rti,
+            Operation::RTS => CPU::rts,
+            Operation::SBC => CPU::sbc,
+            Operation::SEC => CPU::sec,
+            Operation::SED => CPU::sed,
+            Operation::SEI => CPU::sei,
+            Operation::STA => CPU::sta,
+            Operation::STX => CPU::stx,
+            Operation::STY => CPU::sty,
+            Operation::TAX => CPU::tax,
+            Operation::TAY => CPU::tay,
+            Operation::TSX => CPU::tsx,
+            Operation::TXA => CPU::txa,
+            Operation::TXS => CPU::txs,
+            Operation::TYA => CPU::tya,
+            Operation::XXX => CPU::xxx,
         }
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct Instruction {
-    pub name: &'static str,
-    pub code: InstructionCode,
+    pub code: u8,
+    pub operation: Operation,
     pub addr_mode: AddressMode,
     pub cycles: u8,
 }
 
+impl std::fmt::Debug for Instruction {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            fmt,
+            "[{} : {:?},{:?} - {}]",
+            self.code, self.operation, self.addr_mode, self.cycles
+        )
+    }
+}
+
 impl Instruction {
     pub const INVALID: Instruction = Instruction {
-        name: "???",
-        code: InstructionCode::XXX,
+        code: 0xff,
+        operation: Operation::XXX,
         addr_mode: AddressMode::XXX,
         cycles: 0,
     };
 }
 
-macro_rules! instruction {
-    ($ins:ident, $addr: ident, $cycles:expr) => {
-        Instruction {
-            name: stringify!($ins),
-            code: InstructionCode::$ins,
-            addr_mode: AddressMode::$addr,
-            cycles: $cycles,
-        }
-    };
-}
-
 impl CPU {
-    const fn make_instructions() -> [[Instruction; 16]; 16] {
-        let mut res = [[Instruction::INVALID; 16]; 16];
+    const fn make_instructions() -> [Instruction; 16 * 16] {
+        let mut res = [Instruction::INVALID; 16 * 16];
+        macro_rules! instruction {
+            ($code:literal, $ins:ident, $addr: ident, $cycles:literal) => {
+                res[$code] = Instruction {
+                    code: $code,
+                    operation: Operation::$ins,
+                    addr_mode: AddressMode::$addr,
+                    cycles: $cycles,
+                }
+            };
+        }
 
         // adc
-        res[0x6][0x9] = instruction!(ADC, IMM, 2);
-        res[0x6][0x5] = instruction!(ADC, ZP0, 3);
-        res[0x6][0x9] = instruction!(ADC, ZPX, 4);
-        res[0x6][0xd] = instruction!(ADC, AB0, 4);
-        res[0x7][0xd] = instruction!(ADC, ABX, 4);
-        res[0x7][0x9] = instruction!(ADC, ABY, 4);
-        res[0x6][0x1] = instruction!(ADC, IDX, 6);
-        res[0x7][0x1] = instruction!(ADC, IDY, 5);
+        instruction!(0x69, ADC, IMM, 2);
+        instruction!(0x65, ADC, ZP0, 3);
+        instruction!(0x69, ADC, ZPX, 4);
+        instruction!(0x6d, ADC, AB0, 4);
+        instruction!(0x7d, ADC, ABX, 4);
+        instruction!(0x79, ADC, ABY, 4);
+        instruction!(0x61, ADC, IDX, 6);
+        instruction!(0x71, ADC, IDY, 5);
 
         // AND - Logical AND
-        res[0x2][0x9] = instruction!(AND, IMM, 2);
-        res[0x2][0x5] = instruction!(AND, ZP0, 3);
-        res[0x3][0x5] = instruction!(AND, ZPX, 4);
-        res[0x2][0xd] = instruction!(AND, AB0, 4);
-        res[0x3][0xd] = instruction!(AND, ABX, 4);
-        res[0x3][0x9] = instruction!(AND, ABY, 4);
-        res[0x2][0x1] = instruction!(AND, IDX, 6);
-        res[0x3][0x1] = instruction!(AND, IDY, 5);
+        instruction!(0x29, AND, IMM, 2);
+        instruction!(0x25, AND, ZP0, 3);
+        instruction!(0x35, AND, ZPX, 4);
+        instruction!(0x2d, AND, AB0, 4);
+        instruction!(0x3d, AND, ABX, 4);
+        instruction!(0x39, AND, ABY, 4);
+        instruction!(0x21, AND, IDX, 6);
+        instruction!(0x31, AND, IDY, 5);
 
         // asl - arithmetic shift left
-        res[0x0][0xa] = instruction!(ASL, ACC, 2);
-        res[0x0][0x6] = instruction!(ASL, ZP0, 5);
-        res[0x1][0x6] = instruction!(ASL, ZPX, 6);
-        res[0x0][0xe] = instruction!(ASL, AB0, 6);
-        res[0x1][0xe] = instruction!(ASL, ABX, 7);
+        instruction!(0x0a, ASL, ACC, 2);
+        instruction!(0x06, ASL, ZP0, 5);
+        instruction!(0x16, ASL, ZPX, 6);
+        instruction!(0x0e, ASL, AB0, 6);
+        instruction!(0x1e, ASL, ABX, 7);
 
         // branches
-        res[0x9][0x0] = instruction!(BCC, REL, 2);
-        res[0xb][0x0] = instruction!(BCS, REL, 2);
-        res[0xf][0x0] = instruction!(BEQ, REL, 2);
-        res[0x3][0x0] = instruction!(BMI, REL, 2);
-        res[0xd][0x0] = instruction!(BNE, REL, 2);
-        res[0x1][0x0] = instruction!(BPL, REL, 2);
-        res[0x5][0x0] = instruction!(BVC, REL, 2);
-        res[0x7][0x0] = instruction!(BVS, REL, 2);
+        instruction!(0x90, BCC, REL, 2);
+        instruction!(0xb0, BCS, REL, 2);
+        instruction!(0xf0, BEQ, REL, 2);
+        instruction!(0x30, BMI, REL, 2);
+        instruction!(0xd0, BNE, REL, 2);
+        instruction!(0x10, BPL, REL, 2);
+        instruction!(0x50, BVC, REL, 2);
+        instruction!(0x70, BVS, REL, 2);
 
         // BRK - Force Interrupt
-        res[0x0][0x0] = instruction!(BRK, IMP, 7);
+        instruction!(0x00, BRK, IMP, 7);
 
         // bit - Bit test
-        res[0x2][0x4] = instruction!(BIT, ZP0, 3);
-        res[0x2][0xc] = instruction!(BIT, AB0, 4);
+        instruction!(0x24, BIT, ZP0, 3);
+        instruction!(0x2c, BIT, AB0, 4);
 
         // clears
-        res[0x1][0x8] = instruction!(CLC, IMP, 2);
-        res[0xd][0x8] = instruction!(CLD, IMP, 2);
-        res[0x5][0x8] = instruction!(CLI, IMP, 2);
-        res[0xb][0x8] = instruction!(CLV, IMP, 2);
+        instruction!(0x18, CLC, IMP, 2);
+        instruction!(0xd8, CLD, IMP, 2);
+        instruction!(0x58, CLI, IMP, 2);
+        instruction!(0xb8, CLV, IMP, 2);
 
         // cmp
-        res[0xc][0x9] = instruction!(CMP, IMM, 2);
-        res[0xc][0x5] = instruction!(CMP, ZP0, 3);
-        res[0xd][0x5] = instruction!(CMP, ZPX, 4);
-        res[0xc][0xd] = instruction!(CMP, AB0, 4);
-        res[0xd][0xd] = instruction!(CMP, ABX, 4);
-        res[0xd][0x9] = instruction!(CMP, ABY, 4);
-        res[0xc][0x1] = instruction!(CMP, IDX, 6);
-        res[0xd][0x1] = instruction!(CMP, IDY, 5);
+        instruction!(0xc9, CMP, IMM, 2);
+        instruction!(0xc5, CMP, ZP0, 3);
+        instruction!(0xd5, CMP, ZPX, 4);
+        instruction!(0xcd, CMP, AB0, 4);
+        instruction!(0xdd, CMP, ABX, 4);
+        instruction!(0xd9, CMP, ABY, 4);
+        instruction!(0xc1, CMP, IDX, 6);
+        instruction!(0xd1, CMP, IDY, 5);
 
         // cpx
-        res[0xe][0x0] = instruction!(CPX, IMM, 2);
-        res[0xe][0x4] = instruction!(CPX, ZP0, 3);
-        res[0xe][0xc] = instruction!(CPX, AB0, 4);
+        instruction!(0xe0, CPX, IMM, 2);
+        instruction!(0xe4, CPX, ZP0, 3);
+        instruction!(0xec, CPX, AB0, 4);
 
         // cpy
-        res[0xc][0x0] = instruction!(CPY, IMM, 2);
-        res[0xc][0x4] = instruction!(CPY, ZP0, 3);
-        res[0xc][0xc] = instruction!(CPY, AB0, 4);
+        instruction!(0xc0, CPY, IMM, 2);
+        instruction!(0xc4, CPY, ZP0, 3);
+        instruction!(0xcc, CPY, AB0, 4);
 
         // dec
-        res[0xc][0x6] = instruction!(DEC, ZP0, 5);
-        res[0xd][0x6] = instruction!(DEC, ZPX, 6);
-        res[0xc][0xe] = instruction!(DEC, AB0, 6);
-        res[0xd][0xe] = instruction!(DEC, ABX, 7);
+        instruction!(0xc6, DEC, ZP0, 5);
+        instruction!(0xd6, DEC, ZPX, 6);
+        instruction!(0xce, DEC, AB0, 6);
+        instruction!(0xde, DEC, ABX, 7);
 
         // decrement registers
-        res[0xc][0xa] = instruction!(DEX, IMP, 2);
-        res[0x8][0x8] = instruction!(DEY, IMP, 2);
+        instruction!(0xca, DEX, IMP, 2);
+        instruction!(0x88, DEY, IMP, 2);
 
         // eor - exclusive or
-        res[0x4][0x9] = instruction!(EOR, IMM, 2);
-        res[0x4][0x5] = instruction!(EOR, ZP0, 3);
-        res[0x5][0x5] = instruction!(EOR, ZPX, 4);
-        res[0x4][0xd] = instruction!(EOR, AB0, 4);
-        res[0x5][0xd] = instruction!(EOR, ABX, 4);
-        res[0x5][0x9] = instruction!(EOR, ABY, 4);
-        res[0x4][0x1] = instruction!(EOR, IDX, 6);
-        res[0x5][0x1] = instruction!(EOR, IDY, 5);
+        instruction!(0x49, EOR, IMM, 2);
+        instruction!(0x45, EOR, ZP0, 3);
+        instruction!(0x55, EOR, ZPX, 4);
+        instruction!(0x4d, EOR, AB0, 4);
+        instruction!(0x5d, EOR, ABX, 4);
+        instruction!(0x59, EOR, ABY, 4);
+        instruction!(0x41, EOR, IDX, 6);
+        instruction!(0x51, EOR, IDY, 5);
 
         // inc - increment memory
-        res[0xe][0x6] = instruction!(INC, ZP0, 5);
-        res[0xf][0x6] = instruction!(INC, ZPX, 6);
-        res[0xe][0xe] = instruction!(INC, AB0, 6);
-        res[0xf][0xe] = instruction!(INC, ABX, 7);
+        instruction!(0xe6, INC, ZP0, 5);
+        instruction!(0xf6, INC, ZPX, 6);
+        instruction!(0xee, INC, AB0, 6);
+        instruction!(0xfe, INC, ABX, 7);
 
         // increment registers
-        res[0xe][0x8] = instruction!(INX, IMP, 2);
-        res[0xc][0x8] = instruction!(INY, IMP, 2);
+        instruction!(0xe8, INX, IMP, 2);
+        instruction!(0xc8, INY, IMP, 2);
 
         // jump
-        res[0x4][0xc] = instruction!(JMP, AB0, 3);
-        res[0x6][0xc] = instruction!(JMP, ID0, 5);
+        instruction!(0x4c, JMP, AB0, 3);
+        instruction!(0x6c, JMP, ID0, 5);
 
-        res[0x2][0x0] = instruction!(JSR, AB0, 6);
+        instruction!(0x20, JSR, AB0, 6);
 
         // lda = load accumulator
-        res[0xa][0x9] = instruction!(LDA, IMM, 2);
-        res[0xa][0x5] = instruction!(LDA, ZP0, 3);
-        res[0xb][0x5] = instruction!(LDA, ZPX, 4);
-        res[0xa][0xd] = instruction!(LDA, AB0, 4);
-        res[0xb][0xd] = instruction!(LDA, ABX, 4);
-        res[0xb][0x9] = instruction!(LDA, ABY, 4);
-        res[0xa][0x1] = instruction!(LDA, IDX, 6);
-        res[0xb][0x1] = instruction!(LDA, IDY, 5);
+        instruction!(0xa9, LDA, IMM, 2);
+        instruction!(0xa5, LDA, ZP0, 3);
+        instruction!(0xb5, LDA, ZPX, 4);
+        instruction!(0xad, LDA, AB0, 4);
+        instruction!(0xbd, LDA, ABX, 4);
+        instruction!(0xb9, LDA, ABY, 4);
+        instruction!(0xa1, LDA, IDX, 6);
+        instruction!(0xb1, LDA, IDY, 5);
 
         // ldx = load x register
-        res[0xa][0x2] = instruction!(LDX, IMM, 2);
-        res[0xa][0x6] = instruction!(LDX, ZP0, 3);
-        res[0xb][0x6] = instruction!(LDX, ZPY, 4);
-        res[0xa][0xe] = instruction!(LDX, AB0, 4);
-        res[0xb][0xe] = instruction!(LDX, ABY, 4);
+        instruction!(0xa2, LDX, IMM, 2);
+        instruction!(0xa6, LDX, ZP0, 3);
+        instruction!(0xb6, LDX, ZPY, 4);
+        instruction!(0xae, LDX, AB0, 4);
+        instruction!(0xbe, LDX, ABY, 4);
 
         // ldy - load y register
-        res[0xa][0x0] = instruction!(LDY, IMM, 2);
-        res[0xa][0x4] = instruction!(LDY, ZP0, 3);
-        res[0xb][0x4] = instruction!(LDY, ZPY, 4);
-        res[0xa][0xc] = instruction!(LDY, AB0, 4);
-        res[0xb][0xc] = instruction!(LDY, ABY, 4);
+        instruction!(0xa0, LDY, IMM, 2);
+        instruction!(0xa4, LDY, ZP0, 3);
+        instruction!(0xb4, LDY, ZPY, 4);
+        instruction!(0xac, LDY, AB0, 4);
+        instruction!(0xbc, LDY, ABY, 4);
 
         // lsr - logical shift right
-        res[0x4][0xa] = instruction!(LSR, ACC, 2);
-        res[0x4][0x6] = instruction!(LSR, ZP0, 5);
-        res[0x5][0x6] = instruction!(LSR, ZPX, 6);
-        res[0x4][0xe] = instruction!(LSR, AB0, 6);
-        res[0x5][0xe] = instruction!(LSR, ABX, 7);
+        instruction!(0x4a, LSR, ACC, 2);
+        instruction!(0x46, LSR, ZP0, 5);
+        instruction!(0x56, LSR, ZPX, 6);
+        instruction!(0x4e, LSR, AB0, 6);
+        instruction!(0x5e, LSR, ABX, 7);
 
         // nop - no operation
-        res[0xe][0xa] = instruction!(NOP, IMP, 2);
+        instruction!(0xea, NOP, IMP, 2);
 
         // ora - logical inclusive or
-        res[0x0][0x9] = instruction!(ORA, IMM, 2);
-        res[0x0][0x5] = instruction!(ORA, ZP0, 3);
-        res[0x1][0x5] = instruction!(ORA, ZPX, 4);
-        res[0x0][0xd] = instruction!(ORA, AB0, 4);
-        res[0x1][0xd] = instruction!(ORA, ABX, 4);
-        res[0x1][0x9] = instruction!(ORA, ABY, 4);
-        res[0x0][0x1] = instruction!(ORA, IDX, 6);
-        res[0x1][0x1] = instruction!(ORA, IDY, 5);
+        instruction!(0x09, ORA, IMM, 2);
+        instruction!(0x05, ORA, ZP0, 3);
+        instruction!(0x15, ORA, ZPX, 4);
+        instruction!(0x0d, ORA, AB0, 4);
+        instruction!(0x1d, ORA, ABX, 4);
+        instruction!(0x19, ORA, ABY, 4);
+        instruction!(0x01, ORA, IDX, 6);
+        instruction!(0x11, ORA, IDY, 5);
 
         // pha - push accumulator
-        res[0x4][0x8] = instruction!(PHA, IMP, 3);
+        instruction!(0x48, PHA, IMP, 3);
 
         // php - push processor status
-        res[0x0][0x8] = instruction!(PHP, IMP, 3);
+        instruction!(0x08, PHP, IMP, 3);
 
         // pla - pull accumulator
-        res[0x6][0x8] = instruction!(PLA, IMP, 4);
+        instruction!(0x68, PLA, IMP, 4);
 
         // plp - pull processor status
-        res[0x2][0x8] = instruction!(PLP, IMP, 4);
+        instruction!(0x28, PLP, IMP, 4);
 
         // rol - rotate left
-        res[0x2][0xa] = instruction!(ROL, ACC, 2);
-        res[0x2][0x6] = instruction!(ROL, ZP0, 5);
-        res[0x3][0x6] = instruction!(ROL, ZPX, 6);
-        res[0x2][0xe] = instruction!(ROL, AB0, 6);
-        res[0x3][0xe] = instruction!(ROL, ABX, 7);
+        instruction!(0x2a, ROL, ACC, 2);
+        instruction!(0x26, ROL, ZP0, 5);
+        instruction!(0x36, ROL, ZPX, 6);
+        instruction!(0x2e, ROL, AB0, 6);
+        instruction!(0x3e, ROL, ABX, 7);
 
         // ror - rotate right
-        res[0x6][0xa] = instruction!(ROR, ACC, 2);
-        res[0x6][0x6] = instruction!(ROR, ZP0, 5);
-        res[0x7][0x6] = instruction!(ROR, ZPX, 6);
-        res[0x6][0xe] = instruction!(ROR, AB0, 6);
-        res[0x7][0xe] = instruction!(ROR, ABX, 7);
+        instruction!(0x6a, ROR, ACC, 2);
+        instruction!(0x66, ROR, ZP0, 5);
+        instruction!(0x76, ROR, ZPX, 6);
+        instruction!(0x6e, ROR, AB0, 6);
+        instruction!(0x7e, ROR, ABX, 7);
 
         // rti - return from interrupt
-        res[0x4][0x0] = instruction!(RTI, IMP, 6);
+        instruction!(0x40, RTI, IMP, 6);
 
         // rts - return from subroutine
-        res[0x6][0x0] = instruction!(RTS, IMP, 6);
+        instruction!(0x60, RTS, IMP, 6);
 
         // sbc - subtract with carry
-        res[0xe][0x9] = instruction!(SBC, IMM, 2);
-        res[0xe][0x5] = instruction!(SBC, ZP0, 3);
-        res[0xf][0x5] = instruction!(SBC, ZPX, 4);
-        res[0xe][0xd] = instruction!(SBC, AB0, 4);
-        res[0xf][0xd] = instruction!(SBC, ABX, 4);
-        res[0xf][0x9] = instruction!(SBC, ABY, 4);
-        res[0xe][0x1] = instruction!(SBC, IDX, 6);
-        res[0xf][0x1] = instruction!(SBC, IDY, 7);
+        instruction!(0xe9, SBC, IMM, 2);
+        instruction!(0xe5, SBC, ZP0, 3);
+        instruction!(0xf5, SBC, ZPX, 4);
+        instruction!(0xed, SBC, AB0, 4);
+        instruction!(0xfd, SBC, ABX, 4);
+        instruction!(0xf9, SBC, ABY, 4);
+        instruction!(0xe1, SBC, IDX, 6);
+        instruction!(0xf1, SBC, IDY, 7);
 
         // sets
-        res[0x3][0x8] = instruction!(SEC, IMP, 2);
-        res[0xf][0x8] = instruction!(SED, IMP, 2);
-        res[0x7][0x8] = instruction!(SEI, IMP, 2);
+        instruction!(0x38, SEC, IMP, 2);
+        instruction!(0xf8, SED, IMP, 2);
+        instruction!(0x78, SEI, IMP, 2);
 
         // sta - store accumulator
-        res[0x8][0x5] = instruction!(STA, ZP0, 2);
-        res[0x9][0x5] = instruction!(STA, ZPX, 4);
-        res[0x8][0xd] = instruction!(STA, AB0, 4);
-        res[0x9][0xd] = instruction!(STA, ABX, 5);
-        res[0x9][0x9] = instruction!(STA, ABY, 5);
-        res[0x8][0x1] = instruction!(STA, IDX, 6);
-        res[0x9][0x1] = instruction!(STA, IDY, 6);
+        instruction!(0x85, STA, ZP0, 2);
+        instruction!(0x95, STA, ZPX, 4);
+        instruction!(0x8d, STA, AB0, 4);
+        instruction!(0x9d, STA, ABX, 5);
+        instruction!(0x99, STA, ABY, 5);
+        instruction!(0x81, STA, IDX, 6);
+        instruction!(0x91, STA, IDY, 6);
 
         // stx - store x register
-        res[0x8][0x6] = instruction!(STX, ZP0, 3);
-        res[0x9][0x6] = instruction!(STX, ZPY, 4);
-        res[0x8][0xe] = instruction!(STX, AB0, 4);
+        instruction!(0x86, STX, ZP0, 3);
+        instruction!(0x96, STX, ZPY, 4);
+        instruction!(0x8e, STX, AB0, 4);
 
         // sty - store y register
-        res[0x8][0x4] = instruction!(STY, ZP0, 3);
-        res[0x9][0x4] = instruction!(STY, ZPX, 4);
-        res[0x8][0xc] = instruction!(STY, AB0, 4);
+        instruction!(0x84, STY, ZP0, 3);
+        instruction!(0x94, STY, ZPX, 4);
+        instruction!(0x8c, STY, AB0, 4);
 
         // transfer
-        res[0xa][0xa] = instruction!(TAX, IMP, 2); // acc -> x
-        res[0xa][0x8] = instruction!(TAY, IMP, 2); // acc -> y
-        res[0xb][0xa] = instruction!(TSX, IMP, 2); // stack -> x
-        res[0x8][0xa] = instruction!(TXA, IMP, 2); // x -> acc
-        res[0x9][0xa] = instruction!(TXS, IMP, 2); // x -> stack
-        res[0x9][0x8] = instruction!(TYA, IMP, 2); // y -> acc
+        instruction!(0xaa, TAX, IMP, 2); // acc -> x
+        instruction!(0xa8, TAY, IMP, 2); // acc -> y
+        instruction!(0xba, TSX, IMP, 2); // stack -> x
+        instruction!(0x8a, TXA, IMP, 2); // x -> acc
+        instruction!(0x9a, TXS, IMP, 2); // x -> stack
+        instruction!(0x98, TYA, IMP, 2); // y -> acc
 
         res
     }
 
-    pub const INSTRUCTIONS: &'static [[Instruction; 16]; 16] = &CPU::make_instructions();
+    pub const INSTRUCTIONS: &'static [Instruction; 16 * 16] = &CPU::make_instructions();
 
     //	add with carry
     pub fn adc(&mut self) {
-        let oper = if self.instruction.addr_mode == AddressMode::IMM {
-            self.oper as u8
-        } else {
-            self.bus.borrow().read_u8(self.oper)
-        };
+        let oper = self.read_oper();
 
         let (mut r, c) = self.a.overflowing_add(oper);
         r += self.get_flag(Self::C) as u8;
@@ -412,11 +417,7 @@ impl CPU {
 
     //	subtract with carry
     pub fn sbc(&mut self) {
-        let oper = if self.instruction.addr_mode == AddressMode::IMM {
-            !(self.oper as u8)
-        } else {
-            !self.bus.borrow().read_u8(self.oper)
-        };
+        let oper = !self.read_oper();
 
         let (mut r, c) = self.a.overflowing_add(oper);
         r += self.get_flag(Self::C) as u8;
@@ -438,19 +439,13 @@ impl CPU {
     }
     //	arithmetic shift left
     pub fn asl(&mut self) {
-        if self.instruction.addr_mode == AddressMode::ACC {
-            self.set_flag(Self::C, self.a.get_bit(7));
-            self.a <<= 1;
-            self.set_flag(Self::Z, self.a != 0);
-            self.set_flag(Self::N, self.a.get_bit(7));
-        } else {
-            let mut v = self.bus.borrow_mut().read_u8(self.oper);
-            self.set_flag(Self::C, v.get_bit(7));
-            v <<= 1;
-            self.bus.borrow_mut().write_u8(self.oper, v);
-            self.set_flag(Self::Z, v != 0);
-            self.set_flag(Self::N, v.get_bit(7));
-        };
+        let mut v = self.read_oper();
+        self.set_flag(Self::C, v.get_bit(7));
+        v <<= 1;
+        self.set_flag(Self::Z, v != 0);
+        self.set_flag(Self::N, v.get_bit(7));
+
+        self.write_oper(v);
     }
     //	branch on carry clear
     pub fn bcc(&mut self) {
@@ -470,7 +465,7 @@ impl CPU {
     }
     //	bit test
     pub fn bit(&mut self) {
-        let v = self.bus.borrow().read_u8(self.oper);
+        let v = self.read_oper();
         self.set_flag(Self::V, v.get_bit(6));
         self.set_flag(Self::N, v.get_bit(7));
         self.set_flag(Self::Z, self.a & v == 0);
@@ -489,16 +484,12 @@ impl CPU {
         self.set_flag(Self::B, true);
 
         // Write program counter to stack and dec the stack pointer
-        self.bus
-            .borrow_mut()
-            .write_u16(Self::STACK + self.s as u16, self.pc);
-        self.s -= 2;
+        self.bus.borrow_mut().write_u16(self.stack_addr(), self.pc);
+        self.sp -= 2;
 
         // write status to stack and dec stack pointer
-        self.bus
-            .borrow_mut()
-            .write_u8(Self::STACK + self.s as u16, self.p);
-        self.s -= 1;
+        self.bus.borrow_mut().write_u8(self.stack_addr(), self.p);
+        self.sp -= 1;
 
         // pc is interrupt address
         self.pc = self.bus.borrow().read_u16(0xfffe);
@@ -530,39 +521,27 @@ impl CPU {
     //	compare (with accumulator)
     pub fn cmp(&mut self) {
         let lhs = self.a;
-        let rhs = if self.instruction.addr_mode == AddressMode::IMM {
-            self.oper as u8
-        } else {
-            self.bus.borrow().read_u8(self.oper)
-        };
+        let rhs = self.read_oper();
         self.compare(lhs, rhs);
     }
     //	compare with X
     pub fn cpx(&mut self) {
         let lhs = self.x;
-        let rhs = if self.instruction.addr_mode == AddressMode::IMM {
-            self.oper as u8
-        } else {
-            self.bus.borrow().read_u8(self.oper)
-        };
+        let rhs = self.read_oper();
         self.compare(lhs, rhs);
     }
     //	compare with Y
     pub fn cpy(&mut self) {
         let lhs = self.y;
-        let rhs = if self.instruction.addr_mode == AddressMode::IMM {
-            self.oper as u8
-        } else {
-            self.bus.borrow().read_u8(self.oper)
-        };
+        let rhs = self.read_oper();
         self.compare(lhs, rhs);
     }
     //	decrement
     pub fn dec(&mut self) {
-        let m = self.bus.borrow().read_u8(self.oper);
-        self.bus.borrow_mut().write_u8(self.oper, m.wrapping_sub(1));
+        let m = self.read_oper().wrapping_sub(1);
         self.set_flag(Self::Z, m == 0);
         self.set_flag(Self::N, m.get_bit(7));
+        self.write_oper(m);
     }
     //	decrement X
     pub fn dex(&mut self) {
@@ -578,20 +557,16 @@ impl CPU {
     }
     //	exclusive or (with accumulator)
     pub fn eor(&mut self) {
-        if self.instruction.addr_mode == AddressMode::IMM {
-            self.a ^= self.oper as u8;
-        } else {
-            self.a ^= self.bus.borrow().read_u8(self.oper);
-        }
+        self.a ^= self.read_oper();
         self.set_flag(Self::Z, self.a == 0);
         self.set_flag(Self::N, self.a.get_bit(7));
     }
     //	increment
     pub fn inc(&mut self) {
-        let m = self.bus.borrow().read_u8(self.oper);
-        self.bus.borrow_mut().write_u8(self.oper, m.wrapping_add(1));
+        let m = self.bus.borrow().read_u8(self.oper).wrapping_add(1);
         self.set_flag(Self::Z, m == 0);
         self.set_flag(Self::N, m.get_bit(7));
+        self.write_oper(m);
     }
     //	increment X
     pub fn inx(&mut self) {
@@ -612,138 +587,93 @@ impl CPU {
     //	jump subroutine
     pub fn jsr(&mut self) {
         self.pc = self.pc.wrapping_sub(1);
-        self.bus
-            .borrow_mut()
-            .write_u16(Self::STACK + self.s as u16, self.pc);
-        self.s = self.s.wrapping_sub(2);
+        self.bus.borrow_mut().write_u16(self.stack_addr(), self.pc);
+        self.sp = self.sp.wrapping_sub(2);
 
         self.pc = self.oper;
     }
     //	load accumulator
     pub fn lda(&mut self) {
-        self.a = if self.instruction.addr_mode == AddressMode::IMM {
-            self.oper as u8
-        } else {
-            self.bus.borrow().read_u8(self.oper)
-        };
+        self.a = self.read_oper();
         self.set_flag(Self::Z, self.a == 0);
         self.set_flag(Self::N, self.a.get_bit(7));
     }
     //	load X
     pub fn ldx(&mut self) {
-        self.x = if self.instruction.addr_mode == AddressMode::IMM {
-            self.oper as u8
-        } else {
-            self.bus.borrow().read_u8(self.oper)
-        };
+        self.x = self.read_oper();
         self.set_flag(Self::Z, self.x == 0);
         self.set_flag(Self::N, self.x.get_bit(7));
     }
     //	load Y
     pub fn ldy(&mut self) {
-        self.y = if self.instruction.addr_mode == AddressMode::IMM {
-            self.oper as u8
-        } else {
-            self.bus.borrow().read_u8(self.oper)
-        };
+        self.y = self.read_oper();
         self.set_flag(Self::Z, self.y == 0);
         self.set_flag(Self::N, self.y.get_bit(7));
     }
     //	logical shift right
     pub fn lsr(&mut self) {
-        let mut v = if self.instruction.addr_mode == AddressMode::ACC {
-            self.a
-        } else {
-            self.bus.borrow_mut().read_u8(self.oper)
-        };
+        let mut v = self.read_oper();
 
         self.set_flag(Self::C, v.get_bit(0));
         v >>= 1;
         self.set_flag(Self::Z, v != 0);
         self.set_flag(Self::N, v.get_bit(7));
 
-        if self.instruction.addr_mode == AddressMode::ACC {
-            self.a = v;
-        } else {
-            self.bus.borrow_mut().write_u8(self.oper, v);
-        };
+        self.write_oper(v);
     }
     //	no operation
     pub fn nop(&mut self) {}
     //	or with accumulator
     pub fn ora(&mut self) {
-        if self.instruction.addr_mode == AddressMode::IMM {
-            self.a |= self.oper as u8;
-            self.set_flag(Self::Z, self.a == 0);
-            self.set_flag(Self::N, self.a.get_bit(7));
-        }
+        self.a |= self.read_oper();
+        self.set_flag(Self::Z, self.a == 0);
+        self.set_flag(Self::N, self.a.get_bit(7));
     }
     //	push accumulator
     pub fn pha(&mut self) {
-        self.bus
-            .borrow_mut()
-            .write_u8(Self::STACK + self.s as u16, self.a);
-        self.s -= 1;
+        self.bus.borrow_mut().write_u8(self.stack_addr(), self.a);
+        self.sp -= 1;
     }
     //	push processor status (SR)
     pub fn php(&mut self) {
-        self.bus
-            .borrow_mut()
-            .write_u8(Self::STACK + self.s as u16, self.p);
-        self.s -= 1;
+        self.bus.borrow_mut().write_u8(self.stack_addr(), self.p);
+        self.sp -= 1;
     }
     //	pull accumulator
     pub fn pla(&mut self) {
-        self.a = self.bus.borrow().read_u8(Self::STACK + self.s as u16);
+        self.a = self.bus.borrow().read_u8(self.stack_addr());
         self.set_flag(Self::Z, self.a != 0);
         self.set_flag(Self::N, self.a.get_bit(7));
-        self.s += 1;
+        self.sp += 1;
     }
     //	pull processor status (SR)
     pub fn plp(&mut self) {
-        self.p = self.bus.borrow().read_u8(Self::STACK + self.s as u16);
-        self.s += 1;
+        self.p = self.bus.borrow().read_u8(self.stack_addr());
+        self.sp += 1;
     }
     //	rotate left
     pub fn rol(&mut self) {
-        if self.instruction.addr_mode == AddressMode::ACC {
-            let mut new = self.a << 1;
-            new |= self.p & 0x1;
-            self.set_flag(Self::C, self.a.get_bit(7));
-            self.set_flag(Self::Z, new == 0);
-            self.set_flag(Self::N, new.get_bit(7));
-            self.a = new;
-        } else {
-            let old = self.bus.borrow().read_u8(self.oper);
-            let mut new = old << 1;
-            new |= self.p & 0x1;
+        let old = self.read_oper();
+        let mut new = old << 1;
+        new |= self.p & 0x1;
 
-            self.set_flag(Self::C, old.get_bit(7));
-            self.set_flag(Self::Z, new == 0);
-            self.set_flag(Self::N, new.get_bit(7));
-            self.bus.borrow_mut().write_u8(self.oper, new);
-        }
+        self.set_flag(Self::C, old.get_bit(0));
+        self.set_flag(Self::Z, new == 0);
+        self.set_flag(Self::N, new.get_bit(7));
+
+        self.write_oper(new);
     }
     //	rotate right
     pub fn ror(&mut self) {
-        if self.instruction.addr_mode == AddressMode::ACC {
-            let mut new = self.a >> 1;
-            new |= (self.p & 0x1) << 7;
+        let old = self.read_oper();
+        let mut new = old >> 1;
+        new |= self.p & 0x80;
 
-            self.set_flag(Self::C, self.a.get_bit(0));
-            self.set_flag(Self::Z, new == 0);
-            self.set_flag(Self::N, new.get_bit(7));
-            self.a = new;
-        } else {
-            let old = self.bus.borrow().read_u8(self.oper);
-            let mut new = old >> 1;
-            new |= (self.p & 0x1) << 7;
+        self.set_flag(Self::C, old.get_bit(0));
+        self.set_flag(Self::Z, new == 0);
+        self.set_flag(Self::N, new.get_bit(7));
 
-            self.set_flag(Self::C, old.get_bit(0));
-            self.set_flag(Self::Z, new == 0);
-            self.set_flag(Self::N, new.get_bit(7));
-            self.bus.borrow_mut().write_u8(self.oper, new);
-        }
+        self.write_oper(new);
     }
     //	return from interrupt
     pub fn rti(&mut self) {}
@@ -752,9 +682,9 @@ impl CPU {
         self.pc = self
             .bus
             .borrow()
-            .read_u16(Self::STACK + self.s as u16)
+            .read_u16(self.stack_addr())
             .wrapping_add(1);
-        self.s = self.s.wrapping_add(2);
+        self.sp = self.sp.wrapping_add(2);
     }
     //	set carry
     pub fn sec(&mut self) {
@@ -790,7 +720,7 @@ impl CPU {
     }
     //	transfer stack pointer to X
     pub fn tsx(&mut self) {
-        self.x = self.s;
+        self.x = self.sp;
     }
     //	transfer X to accumulator
     pub fn txa(&mut self) {
@@ -798,7 +728,7 @@ impl CPU {
     }
     //	transfer X to stack pointer
     pub fn txs(&mut self) {
-        self.s = self.x;
+        self.sp = self.x;
     }
     //	transfer Y to accumulator
     pub fn tya(&mut self) {

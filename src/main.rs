@@ -8,8 +8,7 @@ use std::rc::Rc;
 use std::convert::AsRef;
 use std::fmt::Debug;
 use std::fs::File;
-use std::io::stdin;
-use std::io::{Error, ErrorKind, Read};
+use std::io::{Error, ErrorKind, Read, Write};
 use std::path::Path;
 
 pub struct Bus {
@@ -210,11 +209,12 @@ struct NES {
 
 impl NES {
     fn run(&mut self) {
-        let mut buf = String::new();
         loop {
-            //stdin().read_line(&mut buf).unwrap();
             self.cpu.clock();
-            println!("{:?}", self.cpu);
+
+            println!("{}", self.cpu);
+            print!("{}[2J", 27 as char);
+            std::thread::sleep(std::time::Duration::from_millis(1));
         }
     }
 

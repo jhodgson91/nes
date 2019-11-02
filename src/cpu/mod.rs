@@ -10,14 +10,14 @@ use std::rc::Rc;
 use bit_field::BitField;
 
 use address_modes::AddressMode;
-use instructions::InstructionCode;
+use instructions::Operation;
 
 use super::Bus;
 
 #[derive(Debug)]
 pub struct CPU {
     pc: u16, // program counter
-    s: u8,   // stack ptr
+    sp: u8,  // stack ptr
     x: u8,   // idx reg x
     y: u8,   // idx reg y
     a: u8,   // accumulator
@@ -31,8 +31,6 @@ pub struct CPU {
 }
 
 impl CPU {
-    const STACK: u16 = 0x0100;
-
     // Flags
     const C: usize = 0; // Carry
     const Z: usize = 1; // Zero
@@ -56,7 +54,7 @@ impl CPU {
             x: 0,
             y: 0,
             a: 0,
-            s: 0xFD,
+            sp: 0xFD,
             p: 0x34,
             oper: 0,
             instruction: Instruction::INVALID,
@@ -70,13 +68,11 @@ impl CPU {
 
     pub fn clock(&mut self) {
         if self.instruction.cycles == 0 {
-            let op = self.bus.borrow().read_u8(self.pc);
-            let (lower, upper) = ((op & 0x0f) as usize, (op >> 4) as usize);
-
-            self.instruction = Self::INSTRUCTIONS[upper][lower];
+            let code = self.bus.borrow().read_u8(self.pc);
+            self.instruction = Self::INSTRUCTIONS[code as usize];
 
             if self.instruction.addr_mode == AddressMode::XXX
-                || self.instruction.code == InstructionCode::XXX
+                || self.instruction.operation == Operation::XXX
             {
                 println!("Invalid instruction incoming at {:X}", self.pc);
             }
@@ -84,7 +80,7 @@ impl CPU {
             self.pc += 1;
 
             (self.instruction.addr_mode.method())(self);
-            (self.instruction.code.method())(self);
+            (self.instruction.operation.method())(self);
         }
 
         self.instruction.cycles = self.instruction.cycles.saturating_sub(1);
@@ -93,5 +89,50 @@ impl CPU {
     // invalid opcode found
     pub fn xxx(&mut self) {
         panic!("Unsupported instruction!")
+    }
+
+    fn read_oper(&self) -> u8 {
+        match self.instruction.addr_mode {
+            AddressMode::ACC => self.a,
+            AddressMode::IMM => self.oper as u8,
+            _ => self.bus.borrow_mut().read_u8(self.oper),
+        }
+    }
+
+    fn write_oper(&mut self, v: u8) {
+        match self.instruction.addr_mode {
+            AddressMode::ACC => self.a = v,
+            AddressMode::IMM => (),
+            _ => self.bus.borrow_mut().write_u8(self.oper, v),
+        }
+    }
+
+    fn stack_addr(&self) -> u16 {
+        0x100u16.wrapping_add(self.sp as u16)
+    }
+}
+
+use std::fmt::{Display, Formatter, Result};
+impl Display for CPU {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
+        writeln!(fmt, "CPU")?;
+        writeln!(fmt, "pc: ${:X}", self.pc)?;
+        writeln!(fmt, "sp: $00{:X}", self.sp)?;
+        writeln!(fmt, "x:  {}", self.x)?;
+        writeln!(fmt, "y:  {}", self.y)?;
+        writeln!(fmt, "p:  NV-BDIZC\n    {:08b}", self.p)?;
+        writeln!(fmt, "\ninstruction:")?;
+        writeln!(fmt, "     code: ${:X}", self.instruction.code)?;
+        writeln!(fmt, "       op: {:?}", self.instruction.operation)?;
+        writeln!(fmt, "addr_mode: {:?}", self.instruction.addr_mode)?;
+
+        match self.instruction.addr_mode {
+            AddressMode::ACC => writeln!(fmt, "     oper:  {}", self.a)?,
+            AddressMode::IMM => writeln!(fmt, "     oper: #{}", self.oper)?,
+            _ => writeln!(fmt, "     oper: ${:04X}", self.oper)?,
+        };
+
+        writeln!(fmt, "   cycles: {}", self.instruction.cycles)?;
+        Ok(())
     }
 }

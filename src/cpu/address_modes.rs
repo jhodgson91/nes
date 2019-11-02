@@ -34,17 +34,14 @@ impl AddressMode {
             AddressMode::ZP0 => CPU::zp0,
             AddressMode::ZPX => CPU::zpx,
             AddressMode::ZPY => CPU::zpy,
-            AddressMode::XXX => CPU::invalid_addr,
+            AddressMode::XXX => CPU::xxx,
         }
     }
 }
 
 impl CPU {
     // Addressing modes
-    // The CPU has alread read and incremented pc for the opcode
-    // These now, from the operand, resolve to the resolved operand of the instruction
-    // This resolved operand is either an absolute address, or a constant
-    // return tuple of (resolved operand, extra cycles needed)
+    // The CPU has already read and incremented pc for the opcode
 
     //....	zeropage	 	        OPC $LL	 	    operand is zeropage address (hi-byte is zero, address = $00LL)
     pub fn zp0(&mut self) {
@@ -117,16 +114,19 @@ impl CPU {
         let ptr = self.bus.borrow().read_u8(self.pc) as u16;
         self.pc += 1;
 
-        let addr = self.bus.borrow().read_u16(ptr).wrapping_add(self.y as u16);
-        let cycles = self.oper = addr;
-        self.instruction.cycles += if ptr & 0xff00 == addr & 0xff00 { 0 } else { 1 };
+        self.oper = self.bus.borrow().read_u16(ptr).wrapping_add(self.y as u16);
+        self.instruction.cycles += if ptr & 0xff00 == self.oper & 0xff00 {
+            0
+        } else {
+            1
+        };
     }
     //....	relative	 	        OPC $BB	 	    branch target is PC + signed offset BB ***
     pub fn rel(&mut self) {
         self.oper = self.bus.borrow().read_u8(self.pc) as u16;
+        if self.oper & 0x80 != 0 {
+            self.oper |= 0xff00;
+        }
         self.pc += 1;
-    }
-    pub fn invalid_addr(&mut self) {
-        panic!("Unsupported instruction!")
     }
 }

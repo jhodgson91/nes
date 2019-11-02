@@ -128,8 +128,6 @@ impl InstructionCode {
     }
 }
 
-type InstructionFn = &'static dyn FnMut(&mut CPU);
-
 #[derive(Debug, Copy, Clone)]
 pub struct Instruction {
     pub name: &'static str,
@@ -374,14 +372,14 @@ impl CPU {
         res[0x8][0xe] = instruction!(STX, AB0, 4);
 
         // sty - store y register
-        res[0x8][0x4] = instruction!(STX, ZP0, 3);
-        res[0x9][0x4] = instruction!(STX, ZPX, 4);
-        res[0x8][0xc] = instruction!(STX, AB0, 4);
+        res[0x8][0x4] = instruction!(STY, ZP0, 3);
+        res[0x9][0x4] = instruction!(STY, ZPX, 4);
+        res[0x8][0xc] = instruction!(STY, AB0, 4);
 
         // transfer
         res[0xa][0xa] = instruction!(TAX, IMP, 2); // acc -> x
         res[0xa][0x8] = instruction!(TAY, IMP, 2); // acc -> y
-        res[0xb][0x8] = instruction!(TSX, IMP, 2); // stack -> x
+        res[0xb][0xa] = instruction!(TSX, IMP, 2); // stack -> x
         res[0x8][0xa] = instruction!(TXA, IMP, 2); // x -> acc
         res[0x9][0xa] = instruction!(TXS, IMP, 2); // x -> stack
         res[0x9][0x8] = instruction!(TYA, IMP, 2); // y -> acc
@@ -392,7 +390,46 @@ impl CPU {
     pub const INSTRUCTIONS: &'static [[Instruction; 16]; 16] = &CPU::make_instructions();
 
     //	add with carry
-    pub fn adc(&mut self) {}
+    pub fn adc(&mut self) {
+        let oper = if self.instruction.addr_mode == AddressMode::IMM {
+            self.oper as u8
+        } else {
+            self.bus.borrow().read_u8(self.oper)
+        };
+
+        let (mut r, c) = self.a.overflowing_add(oper);
+        r += self.get_flag(Self::C) as u8;
+
+        let v = (self.a ^ oper & !(self.a ^ r) & 0x80) != 0;
+
+        self.set_flag(Self::V, v);
+        self.set_flag(Self::C, c);
+        self.set_flag(Self::Z, r == 0);
+        self.set_flag(Self::N, r.get_bit(7));
+
+        self.a = r;
+    }
+
+    //	subtract with carry
+    pub fn sbc(&mut self) {
+        let oper = if self.instruction.addr_mode == AddressMode::IMM {
+            !(self.oper as u8)
+        } else {
+            !self.bus.borrow().read_u8(self.oper)
+        };
+
+        let (mut r, c) = self.a.overflowing_add(oper);
+        r += self.get_flag(Self::C) as u8;
+
+        let v = (self.a ^ oper & !(self.a ^ r) & 0x80) != 0;
+
+        self.set_flag(Self::V, v);
+        self.set_flag(Self::C, c);
+        self.set_flag(Self::Z, r == 0);
+        self.set_flag(Self::N, r.get_bit(7));
+
+        self.a = r;
+    }
     //	and (with accumulator)
     pub fn and(&mut self) {
         self.a &= self.oper as u8;
@@ -522,20 +559,20 @@ impl CPU {
     }
     //	decrement
     pub fn dec(&mut self) {
-        let m = self.bus.borrow().read_u8(self.oper) - 1;
-        self.bus.borrow_mut().write_u8(self.oper, m);
+        let m = self.bus.borrow().read_u8(self.oper);
+        self.bus.borrow_mut().write_u8(self.oper, m.wrapping_sub(1));
         self.set_flag(Self::Z, m == 0);
         self.set_flag(Self::N, m.get_bit(7));
     }
     //	decrement X
     pub fn dex(&mut self) {
-        self.x -= 1;
+        self.x = self.x.wrapping_sub(1);
         self.set_flag(Self::Z, self.x == 0);
         self.set_flag(Self::N, self.x.get_bit(7));
     }
     //	decrement Y
     pub fn dey(&mut self) {
-        self.y -= 1;
+        self.y = self.y.wrapping_sub(1);
         self.set_flag(Self::Z, self.y == 0);
         self.set_flag(Self::N, self.y.get_bit(7));
     }
@@ -551,20 +588,20 @@ impl CPU {
     }
     //	increment
     pub fn inc(&mut self) {
-        let m = self.bus.borrow().read_u8(self.oper) + 1;
-        self.bus.borrow_mut().write_u8(self.oper, m);
+        let m = self.bus.borrow().read_u8(self.oper);
+        self.bus.borrow_mut().write_u8(self.oper, m.wrapping_add(1));
         self.set_flag(Self::Z, m == 0);
         self.set_flag(Self::N, m.get_bit(7));
     }
     //	increment X
     pub fn inx(&mut self) {
-        self.x += 1;
+        self.x = self.x.wrapping_add(1);
         self.set_flag(Self::Z, self.x == 0);
         self.set_flag(Self::N, self.x.get_bit(7));
     }
     //	increment Y
     pub fn iny(&mut self) {
-        self.y += 1;
+        self.y = self.y.wrapping_add(1);
         self.set_flag(Self::Z, self.y == 0);
         self.set_flag(Self::N, self.y.get_bit(7));
     }
@@ -573,22 +610,42 @@ impl CPU {
         self.pc = self.oper;
     }
     //	jump subroutine
-    pub fn jsr(&mut self) {}
+    pub fn jsr(&mut self) {
+        self.pc = self.pc.wrapping_sub(1);
+        self.bus
+            .borrow_mut()
+            .write_u16(Self::STACK + self.s as u16, self.pc);
+        self.s = self.s.wrapping_sub(2);
+
+        self.pc = self.oper;
+    }
     //	load accumulator
     pub fn lda(&mut self) {
-        self.a = self.bus.borrow().read_u8(self.oper);
+        self.a = if self.instruction.addr_mode == AddressMode::IMM {
+            self.oper as u8
+        } else {
+            self.bus.borrow().read_u8(self.oper)
+        };
         self.set_flag(Self::Z, self.a == 0);
         self.set_flag(Self::N, self.a.get_bit(7));
     }
     //	load X
     pub fn ldx(&mut self) {
-        self.x = self.bus.borrow().read_u8(self.oper);
+        self.x = if self.instruction.addr_mode == AddressMode::IMM {
+            self.oper as u8
+        } else {
+            self.bus.borrow().read_u8(self.oper)
+        };
         self.set_flag(Self::Z, self.x == 0);
         self.set_flag(Self::N, self.x.get_bit(7));
     }
     //	load Y
     pub fn ldy(&mut self) {
-        self.y = self.bus.borrow().read_u8(self.oper);
+        self.y = if self.instruction.addr_mode == AddressMode::IMM {
+            self.oper as u8
+        } else {
+            self.bus.borrow().read_u8(self.oper)
+        };
         self.set_flag(Self::Z, self.y == 0);
         self.set_flag(Self::N, self.y.get_bit(7));
     }
@@ -691,9 +748,14 @@ impl CPU {
     //	return from interrupt
     pub fn rti(&mut self) {}
     //	return from subroutine
-    pub fn rts(&mut self) {}
-    //	subtract with carry
-    pub fn sbc(&mut self) {}
+    pub fn rts(&mut self) {
+        self.pc = self
+            .bus
+            .borrow()
+            .read_u16(Self::STACK + self.s as u16)
+            .wrapping_add(1);
+        self.s = self.s.wrapping_add(2);
+    }
     //	set carry
     pub fn sec(&mut self) {
         self.set_flag(Self::C, true);
@@ -742,6 +804,4 @@ impl CPU {
     pub fn tya(&mut self) {
         self.a = self.y;
     }
-    // invalid instruction
-    pub fn xxx(&mut self) {}
 }

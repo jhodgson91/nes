@@ -7,7 +7,7 @@ impl CPU {
         if cond {
             self.instruction.cycles += 1;
 
-            let addr = self.pc + addr;
+            let addr = self.pc.wrapping_add(addr);
             if addr & 0xff00 != self.pc & 0xff00 {
                 self.instruction.cycles += 1;
             }

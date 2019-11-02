@@ -17,7 +17,7 @@ pub struct Bus {
 }
 
 impl Debug for Bus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Ok(())
     }
 }
@@ -94,7 +94,7 @@ impl ROM {
             None
         };
 
-        let (prg_size, prg_rom) = {
+        let prg_rom = {
             // first 4 bits of byte 9 == msb
             let msb = (header[9] & 0xf) as u16;
             // byte 4 == lsb
@@ -109,7 +109,7 @@ impl ROM {
             } else {
                 let mut res = vec![0; size * 16_384];
                 file.read_exact(res.as_mut_slice())?;
-                (size, res)
+                res
             }
         };
 
@@ -212,7 +212,7 @@ impl NES {
     fn run(&mut self) {
         let mut buf = String::new();
         loop {
-            stdin().read_line(&mut buf).unwrap();
+            //stdin().read_line(&mut buf).unwrap();
             self.cpu.clock();
             println!("{:?}", self.cpu);
         }

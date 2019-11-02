@@ -9,6 +9,9 @@ use std::rc::Rc;
 
 use bit_field::BitField;
 
+use address_modes::AddressMode;
+use instructions::InstructionCode;
+
 use super::Bus;
 
 #[derive(Debug)]
@@ -68,15 +71,27 @@ impl CPU {
     pub fn clock(&mut self) {
         if self.instruction.cycles == 0 {
             let op = self.bus.borrow().read_u8(self.pc);
-            self.pc += 1;
             let (lower, upper) = ((op & 0x0f) as usize, (op >> 4) as usize);
 
             self.instruction = Self::INSTRUCTIONS[upper][lower];
+
+            if self.instruction.addr_mode == AddressMode::XXX
+                || self.instruction.code == InstructionCode::XXX
+            {
+                println!("Invalid instruction incoming at {:X}", self.pc);
+            }
+
+            self.pc += 1;
 
             (self.instruction.addr_mode.method())(self);
             (self.instruction.code.method())(self);
         }
 
         self.instruction.cycles = self.instruction.cycles.saturating_sub(1);
+    }
+
+    // invalid opcode found
+    pub fn xxx(&mut self) {
+        panic!("Unsupported instruction!")
     }
 }

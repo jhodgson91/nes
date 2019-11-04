@@ -25,6 +25,7 @@ pub struct CPU {
 
     oper: u16, // Operation for the current instruction
 
+    interrupt: bool,
     instruction: Instruction,
 
     bus: Rc<RefCell<Bus>>,
@@ -57,6 +58,7 @@ impl CPU {
             sp: 0xFD,
             p: 0x34,
             oper: 0,
+            interrupt: false,
             instruction: Instruction::INVALID,
             bus,
         }
@@ -64,10 +66,23 @@ impl CPU {
 
     pub fn reset() {}
     pub fn nmi() {}
-    pub fn irq() {}
 
     pub fn clock(&mut self) {
         if self.instruction.cycles == 0 {
+            if self.interrupt {
+                self.set_flag(Self::I, true);
+
+                // Write program counter to stack and dec the stack pointer
+                self.bus.borrow_mut().write_u16(self.stack_addr(), self.pc);
+                self.sp -= 2;
+
+                // write status to stack and dec stack pointer
+                self.bus.borrow_mut().write_u8(self.stack_addr(), self.p);
+                self.sp -= 1;
+
+                self.pc = self.bus.borrow().read_u16(0xfffe);
+            }
+
             let code = self.bus.borrow().read_u8(self.pc);
             self.instruction = Self::INSTRUCTIONS[code as usize];
 

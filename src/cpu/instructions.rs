@@ -402,34 +402,34 @@ impl CPU {
     pub fn adc(&mut self) {
         let oper = self.read_oper();
 
-        let (mut r, c) = self.a.overflowing_add(oper);
-        r += self.get_flag(Self::C) as u8;
+        let a1 = self.a.overflowing_add(oper);
+        let a2 = a1.0.overflowing_add(self.get_flag(Self::C) as u8);
 
-        let v = (self.a ^ oper & !(self.a ^ r) & 0x80) != 0;
+        let v = (self.a ^ oper & !(self.a ^ a2.0) & 0x80) != 0;
 
         self.set_flag(Self::V, v);
-        self.set_flag(Self::C, c);
-        self.set_flag(Self::Z, r == 0);
-        self.set_flag(Self::N, r.get_bit(7));
+        self.set_flag(Self::C, a1.1 | a2.1);
+        self.set_flag(Self::Z, a2.0 == 0);
+        self.set_flag(Self::N, a2.0.get_bit(7));
 
-        self.a = r;
+        self.a = a2.0;
     }
 
     //	subtract with carry
     pub fn sbc(&mut self) {
         let oper = !self.read_oper();
 
-        let (mut r, c) = self.a.overflowing_add(oper);
-        r += self.get_flag(Self::C) as u8;
+        let a1 = self.a.overflowing_add(oper);
+        let a2 = a1.0.overflowing_add(self.get_flag(Self::C) as u8);
 
-        let v = (self.a ^ oper & !(self.a ^ r) & 0x80) != 0;
+        let v = (self.a ^ oper & !(self.a ^ a2.0) & 0x80) != 0;
 
         self.set_flag(Self::V, v);
-        self.set_flag(Self::C, c);
-        self.set_flag(Self::Z, r == 0);
-        self.set_flag(Self::N, r.get_bit(7));
+        self.set_flag(Self::C, a1.1 | a2.1);
+        self.set_flag(Self::Z, a2.0 == 0);
+        self.set_flag(Self::N, a2.0.get_bit(7));
 
-        self.a = r;
+        self.a = a2.0;
     }
     //	and (with accumulator)
     pub fn and(&mut self) {

@@ -1,4 +1,5 @@
 use super::CPU;
+use bit_field::BitField;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum AddressMode {
@@ -124,7 +125,7 @@ impl CPU {
     //....	relative	 	        OPC $BB	 	    branch target is PC + signed offset BB ***
     pub fn rel(&mut self) {
         self.oper = self.bus.borrow().read_u8(self.pc) as u16;
-        if self.oper & 0x80 != 0 {
+        if self.oper.get_bit(7) {
             self.oper |= 0xff00;
         }
         self.pc += 1;

@@ -25,7 +25,7 @@ pub struct CPU {
 
     oper: u16, // Operation for the current instruction
 
-    interrupt: bool,
+    interrupt_addr: Option<u16>,
     instruction: Instruction,
 
     bus: Rc<RefCell<Bus>>,
@@ -58,29 +58,35 @@ impl CPU {
             sp: 0xFD,
             p: 0x34,
             oper: 0,
-            interrupt: false,
+            interrupt_addr: None,
             instruction: Instruction::INVALID,
             bus,
         }
     }
 
-    pub fn reset() {}
-    pub fn nmi() {}
+    pub fn reset(&mut self) {
+        self.interrupt_addr = Some(0xfffc);
+    }
+    pub fn nmi(&mut self) {
+        self.set_flag(Self::B, false);
+        self.store_state();
+        self.interrupt_addr = Some(0xfffa);
+    }
+
+    pub fn irq(&mut self) {
+        if !self.get_flag(Self::I) {
+            self.set_flag(Self::B, false);
+            self.store_state();
+            self.interrupt_addr = Some(0xfffe);
+        }
+    }
 
     pub fn clock(&mut self) {
         if self.instruction.cycles == 0 {
-            if self.interrupt {
+            if let Some(addr) = self.interrupt_addr {
                 self.set_flag(Self::I, true);
 
-                // Write program counter to stack and dec the stack pointer
-                self.bus.borrow_mut().write_u16(self.stack_addr(), self.pc);
-                self.sp -= 2;
-
-                // write status to stack and dec stack pointer
-                self.bus.borrow_mut().write_u8(self.stack_addr(), self.p);
-                self.sp -= 1;
-
-                self.pc = self.bus.borrow().read_u16(0xfffe);
+                self.pc = self.bus.borrow().read_u16(addr);
             }
 
             let code = self.bus.borrow().read_u8(self.pc);
@@ -96,6 +102,10 @@ impl CPU {
 
             (self.instruction.addr_mode.method())(self);
             (self.instruction.operation.method())(self);
+
+            println!("{}", self);
+            print!("{}[2J", 27 as char);
+            std::thread::sleep(std::time::Duration::from_millis(1));
         }
 
         self.instruction.cycles = self.instruction.cycles.saturating_sub(1);
@@ -123,7 +133,7 @@ impl CPU {
     }
 
     fn stack_addr(&self) -> u16 {
-        0x100u16.wrapping_add(self.sp as u16)
+        0x100u16 + self.sp as u16
     }
 }
 
@@ -131,8 +141,9 @@ use std::fmt::{Display, Formatter, Result};
 impl Display for CPU {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
         writeln!(fmt, "CPU")?;
-        writeln!(fmt, "pc: ${:X}", self.pc)?;
-        writeln!(fmt, "sp: $00{:X}", self.sp)?;
+        writeln!(fmt, "pc: ${:04X}", self.pc)?;
+        writeln!(fmt, "sp: ${:04X}", self.sp)?;
+        writeln!(fmt, "a:  {}", self.a)?;
         writeln!(fmt, "x:  {}", self.x)?;
         writeln!(fmt, "y:  {}", self.y)?;
         writeln!(fmt, "p:  NV-BDIZC\n    {:08b}", self.p)?;
@@ -142,8 +153,8 @@ impl Display for CPU {
         writeln!(fmt, "addr_mode: {:?}", self.instruction.addr_mode)?;
 
         match self.instruction.addr_mode {
-            AddressMode::ACC => writeln!(fmt, "     oper:  {}", self.a)?,
-            AddressMode::IMM => writeln!(fmt, "     oper: #{}", self.oper)?,
+            AddressMode::ACC => writeln!(fmt, "     oper:  {:2X}", self.a)?,
+            AddressMode::IMM => writeln!(fmt, "     oper: #{:2X}", self.oper)?,
             _ => writeln!(fmt, "     oper: ${:04X}", self.oper)?,
         };
 

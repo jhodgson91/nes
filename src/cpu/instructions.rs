@@ -482,17 +482,11 @@ impl CPU {
     pub fn brk(&mut self) {
         // Set break flag
         self.set_flag(Self::B, true);
+        self.set_flag(Self::I, true);
+        self.store_state();
+        self.set_flag(Self::B, false);
 
-        // Write program counter to stack and dec the stack pointer
-        self.bus.borrow_mut().write_u16(self.stack_addr(), self.pc);
-        self.sp -= 2;
-
-        // write status to stack and dec stack pointer
-        self.bus.borrow_mut().write_u8(self.stack_addr(), self.p);
-        self.sp -= 1;
-
-        // pc is interrupt address
-        self.pc = self.bus.borrow().read_u16(0xfffe);
+        self.pc = self.bus.borrow_mut().read_u16(0xfffe);
     }
     //	branch on overflow clear
     pub fn bvc(&mut self) {
@@ -586,11 +580,17 @@ impl CPU {
     }
     //	jump subroutine
     pub fn jsr(&mut self) {
-        self.pc = self.pc.wrapping_sub(1);
-        self.bus.borrow_mut().write_u16(self.stack_addr(), self.pc);
+        self.bus
+            .borrow_mut()
+            .write_u16(self.stack_addr(), self.pc - 1);
         self.sp = self.sp.wrapping_sub(2);
 
         self.pc = self.oper;
+    }
+    //	return from subroutine
+    pub fn rts(&mut self) {
+        self.sp = self.sp.wrapping_add(2);
+        self.pc = self.bus.borrow().read_u16(self.stack_addr()) + 1;
     }
     //	load accumulator
     pub fn lda(&mut self) {
@@ -632,24 +632,24 @@ impl CPU {
     //	push accumulator
     pub fn pha(&mut self) {
         self.bus.borrow_mut().write_u8(self.stack_addr(), self.a);
-        self.sp -= 1;
+        self.sp = self.sp.wrapping_sub(1);
     }
     //	push processor status (SR)
     pub fn php(&mut self) {
         self.bus.borrow_mut().write_u8(self.stack_addr(), self.p);
-        self.sp -= 1;
+        self.sp = self.sp.wrapping_sub(1);
     }
     //	pull accumulator
     pub fn pla(&mut self) {
         self.a = self.bus.borrow().read_u8(self.stack_addr());
         self.set_flag(Self::Z, self.a != 0);
         self.set_flag(Self::N, self.a.get_bit(7));
-        self.sp += 1;
+        self.sp = self.sp.wrapping_add(1);
     }
     //	pull processor status (SR)
     pub fn plp(&mut self) {
         self.p = self.bus.borrow().read_u8(self.stack_addr());
-        self.sp += 1;
+        self.sp = self.sp.wrapping_add(1);
     }
     //	rotate left
     pub fn rol(&mut self) {
@@ -676,15 +676,8 @@ impl CPU {
         self.write_oper(new);
     }
     //	return from interrupt
-    pub fn rti(&mut self) {}
-    //	return from subroutine
-    pub fn rts(&mut self) {
-        self.pc = self
-            .bus
-            .borrow()
-            .read_u16(self.stack_addr())
-            .wrapping_add(1);
-        self.sp = self.sp.wrapping_add(2);
+    pub fn rti(&mut self) {
+        self.restore_state();
     }
     //	set carry
     pub fn sec(&mut self) {

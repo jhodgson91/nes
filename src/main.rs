@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::convert::AsRef;
 use std::fmt::Debug;
 use std::fs::File;
-use std::io::{Error, ErrorKind, Read, Write};
+use std::io::{Error, ErrorKind, Read};
 use std::path::Path;
 
 pub struct Bus {
@@ -22,49 +22,29 @@ impl Debug for Bus {
 }
 
 impl Bus {
-    pub fn get_u8(&self, addr: u16) -> &u8 {
-        &self.memory[Self::map_addr(addr)]
-    }
-
-    pub fn get_u8_mut(&mut self, addr: u16) -> &mut u8 {
-        &mut self.memory[Self::map_addr(addr)]
-    }
-
     pub fn read_u8(&self, addr: u16) -> u8 {
-        self.memory[Self::map_addr(addr)]
-    }
-
-    pub fn read_u16(&self, addr: u16) -> u16 {
-        let mapped = Self::map_addr(addr);
-        let mut bytes = [0u8; 2];
-        bytes.copy_from_slice(&self.memory[mapped..=mapped + 1]);
-        u16::from_le_bytes(bytes)
+        self.memory[addr as usize]
     }
 
     pub fn write_u8(&mut self, addr: u16, data: u8) {
-        self.memory[Self::map_addr(addr)] = data;
+        self.memory[addr as usize] = data;
+    }
+
+    pub fn read_u16(&self, addr: u16) -> u16 {
+        let addr = addr as usize;
+        let mut bytes = [0u8; 2];
+        bytes.copy_from_slice(&self.memory[addr..=addr + 1]);
+        u16::from_le_bytes(bytes)
     }
 
     pub fn write_u16(&mut self, addr: u16, data: u16) {
-        let mapped = Self::map_addr(addr);
-        (&mut self.memory[mapped..=mapped + 1]).copy_from_slice(&data.to_le_bytes());
+        let addr = addr as usize;
+        (&mut self.memory[addr..=addr + 1]).copy_from_slice(&data.to_le_bytes());
     }
 
     pub fn write_range(&mut self, addr: u16, data: &[u8]) {
         let addr = addr as usize;
         (&mut self.memory[addr..addr + data.len()]).copy_from_slice(data);
-    }
-
-    fn map_addr(addr: u16) -> usize {
-        const IO_END: u16 = 0x3fff;
-        const RAM_END: u16 = 0x1fff;
-        const RAM_MIRROR_START: u16 = 0x1ff;
-
-        match addr {
-            0..=RAM_END => (addr & RAM_MIRROR_START) as usize, // Handle RAM mirroring
-            RAM_END..=IO_END => ((addr & 0x7) | 0x2000) as usize, // Handle IO register mirroring
-            _ => addr as usize,
-        }
     }
 }
 
@@ -211,10 +191,6 @@ impl NES {
     fn run(&mut self) {
         loop {
             self.cpu.clock();
-
-            println!("{}", self.cpu);
-            print!("{}[2J", 27 as char);
-            std::thread::sleep(std::time::Duration::from_millis(1));
         }
     }
 
@@ -233,7 +209,7 @@ impl NES {
 }
 
 fn main() -> std::io::Result<()> {
-    let mut n = NES::new("/home/james/Downloads/immediate.nes")?;
+    let mut n = NES::new("/home/james/Downloads/tutor.nes")?;
     n.run();
 
     Ok(())

@@ -386,17 +386,17 @@ impl CPU {
         instruction!(0x8c, STY, AB0, 4);
 
         // transfer
-        instruction!(0xaa, TAX, IMP, 2); // acc -> x
         instruction!(0xa8, TAY, IMP, 2); // acc -> y
-        instruction!(0xba, TSX, IMP, 2); // stack -> x
-        instruction!(0x8a, TXA, IMP, 2); // x -> acc
-        instruction!(0x9a, TXS, IMP, 2); // x -> stack
         instruction!(0x98, TYA, IMP, 2); // y -> acc
+        instruction!(0xba, TSX, IMP, 2); // stack -> x
+        instruction!(0x9a, TXS, IMP, 2); // x -> stack
+        instruction!(0xaa, TAX, IMP, 2); // acc -> x
+        instruction!(0x8a, TXA, IMP, 2); // x -> acc
 
         res
     }
 
-    pub const INSTRUCTIONS: &'static [Instruction; 16 * 16] = &CPU::make_instructions();
+    pub const INSTRUCTIONS: [Instruction; 16 * 16] = CPU::make_instructions();
 
     //	add with carry
     pub fn adc(&mut self) {

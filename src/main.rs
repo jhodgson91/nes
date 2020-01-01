@@ -33,13 +33,13 @@ impl Bus {
     pub fn read_u16(&self, addr: u16) -> u16 {
         let addr = addr as usize;
         let mut bytes = [0u8; 2];
-        bytes.copy_from_slice(&self.memory[addr..=addr + 1]);
+        bytes.copy_from_slice(&self.memory[addr..addr + 2]);
         u16::from_le_bytes(bytes)
     }
 
     pub fn write_u16(&mut self, addr: u16, data: u16) {
         let addr = addr as usize;
-        (&mut self.memory[addr..=addr + 1]).copy_from_slice(&data.to_le_bytes());
+        (&mut self.memory[addr..addr + 2]).copy_from_slice(&data.to_le_bytes());
     }
 
     pub fn write_range(&mut self, addr: u16, data: &[u8]) {
@@ -202,7 +202,7 @@ impl NES {
         let mut rom = ROM::from_file(bus.clone(), File::open(rom_path)?)?;
         rom.load_prg();
 
-        let cpu = CPU::new(bus.clone(), bus.borrow().read_u16(0xfffc));
+        let cpu = CPU::new(bus.clone());
 
         Ok(NES { cpu, rom })
     }

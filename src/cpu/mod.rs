@@ -23,7 +23,7 @@ pub struct CPU {
     a: u8,   // accumulator
     p: u8,   // status
 
-    oper: u16, // Operation for the current instruction
+    oper: u16, // Operand for the current instruction
 
     interrupt_addr: Option<u16>,
     instruction: Instruction,
@@ -49,13 +49,14 @@ impl CPU {
         self.p.set_bit(f, val);
     }
 
-    pub fn new(bus: Rc<RefCell<Bus>>, pc: u16) -> Self {
+    pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
+        let pc = bus.borrow().read_u16(0xfffc);
         CPU {
             pc,
             x: 0,
             y: 0,
             a: 0,
-            sp: 0xFD,
+            sp: 0xfd,
             p: 0x34,
             oper: 0,
             interrupt_addr: None,
@@ -89,8 +90,7 @@ impl CPU {
                 self.pc = self.bus.borrow().read_u16(addr);
             }
 
-            let code = self.bus.borrow().read_u8(self.pc);
-            self.instruction = Self::INSTRUCTIONS[code as usize];
+            self.instruction = Self::INSTRUCTIONS[self.bus.borrow().read_u8(self.pc) as usize];
 
             if self.instruction.addr_mode == AddressMode::XXX
                 || self.instruction.operation == Operation::XXX
@@ -108,7 +108,7 @@ impl CPU {
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
 
-        self.instruction.cycles = self.instruction.cycles.saturating_sub(1);
+        self.instruction.cycles -= 1;
     }
 
     /// invalid opcode found

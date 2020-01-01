@@ -65,7 +65,7 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn method(&self) -> impl Fn(&mut CPU) {
+    pub fn method(&self) -> fn(&mut CPU) {
         match self {
             Operation::ADC => CPU::adc,
             Operation::AND => CPU::and,
@@ -483,7 +483,7 @@ impl CPU {
         // Set break flag
         self.set_flag(Self::B, true);
         self.set_flag(Self::I, true);
-        self.store_state();
+        self.push_state();
         self.set_flag(Self::B, false);
 
         self.pc = self.bus.borrow_mut().read_u16(0xfffe);
@@ -677,7 +677,7 @@ impl CPU {
     }
     //	return from interrupt
     pub fn rti(&mut self) {
-        self.restore_state();
+        self.pop_state();
     }
     //	set carry
     pub fn sec(&mut self) {

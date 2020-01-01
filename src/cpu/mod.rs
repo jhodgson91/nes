@@ -69,14 +69,14 @@ impl CPU {
     }
     pub fn nmi(&mut self) {
         self.set_flag(Self::B, false);
-        self.store_state();
+        self.push_state();
         self.interrupt_addr = Some(0xfffa);
     }
 
     pub fn irq(&mut self) {
         if !self.get_flag(Self::I) {
             self.set_flag(Self::B, false);
-            self.store_state();
+            self.push_state();
             self.interrupt_addr = Some(0xfffe);
         }
     }
@@ -111,11 +111,12 @@ impl CPU {
         self.instruction.cycles = self.instruction.cycles.saturating_sub(1);
     }
 
-    // invalid opcode found
+    /// invalid opcode found
     pub fn xxx(&mut self) {
         panic!("Unsupported instruction!")
     }
 
+    /// Reads the operand according to address mode
     fn read_oper(&self) -> u8 {
         match self.instruction.addr_mode {
             AddressMode::ACC => self.a,
@@ -124,6 +125,7 @@ impl CPU {
         }
     }
 
+    /// Writes to the operand according to address mode
     fn write_oper(&mut self, v: u8) {
         match self.instruction.addr_mode {
             AddressMode::ACC => self.a = v,

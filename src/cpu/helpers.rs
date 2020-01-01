@@ -22,7 +22,7 @@ impl CPU {
         self.set_flag(Self::N, (lhs.wrapping_sub(rhs)).get_bit(7));
     }
 
-    pub(super) fn store_state(&mut self) {
+    pub(super) fn push_state(&mut self) {
         // Write program counter to stack and dec the stack pointer
         self.bus.borrow_mut().write_u16(self.stack_addr(), self.pc);
         self.sp = self.sp.wrapping_sub(2);
@@ -32,7 +32,7 @@ impl CPU {
         self.sp = self.sp.wrapping_sub(1);
     }
 
-    pub(super) fn restore_state(&mut self) {
+    pub(super) fn pop_state(&mut self) {
         self.sp = self.sp.wrapping_add(1);
         self.p = self.bus.borrow_mut().read_u8(self.stack_addr());
 

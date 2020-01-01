@@ -20,7 +20,7 @@ pub enum AddressMode {
 }
 
 impl AddressMode {
-    pub fn method(&self) -> impl Fn(&mut CPU) {
+    pub fn method(&self) -> fn(&mut CPU) {
         match self {
             AddressMode::ACC => CPU::acc,
             AddressMode::AB0 => CPU::ab0,

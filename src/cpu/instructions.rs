@@ -172,7 +172,7 @@ impl CPU {
         // adc
         instruction!(0x69, ADC, IMM, 2);
         instruction!(0x65, ADC, ZP0, 3);
-        instruction!(0x69, ADC, ZPX, 4);
+        instruction!(0x75, ADC, ZPX, 4);
         instruction!(0x6d, ADC, AB0, 4);
         instruction!(0x7d, ADC, ABX, 4);
         instruction!(0x79, ADC, ABY, 4);
@@ -636,7 +636,7 @@ impl CPU {
     }
     //	push processor status (SR)
     pub fn php(&mut self) {
-        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.p);
+        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.st);
         self.sp = self.sp.wrapping_sub(1);
     }
     //	pull accumulator
@@ -648,14 +648,14 @@ impl CPU {
     }
     //	pull processor status (SR)
     pub fn plp(&mut self) {
-        self.p = self.bus.borrow().cpu_read(self.stack_addr());
+        self.st = self.bus.borrow().cpu_read(self.stack_addr());
         self.sp = self.sp.wrapping_add(1);
     }
     //	rotate left
     pub fn rol(&mut self) {
         let old = self.read_oper();
         let mut new = old << 1;
-        new |= self.p & 0x1;
+        new |= self.st & 0x1;
 
         self.set_flag(Self::C, old.get_bit(0));
         self.set_flag(Self::Z, new == 0);
@@ -667,7 +667,7 @@ impl CPU {
     pub fn ror(&mut self) {
         let old = self.read_oper();
         let mut new = old >> 1;
-        new |= self.p & 0x80;
+        new |= self.st & 0x80;
 
         self.set_flag(Self::C, old.get_bit(0));
         self.set_flag(Self::Z, new == 0);

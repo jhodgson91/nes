@@ -11,12 +11,10 @@ use std::rc::Rc;
 
 use std::convert::AsRef;
 use std::fs::File;
-use std::io::{Error, ErrorKind, Read};
 use std::path::Path;
 
 struct NES {
     pub cpu: CPU,
-    pub rom: Cartridge,
 }
 
 impl NES {
@@ -27,14 +25,9 @@ impl NES {
     }
 
     fn new<P: AsRef<Path>>(rom_path: P) -> std::io::Result<Self> {
-        let bus: Rc<RefCell<Bus>> = Rc::default();
-
-        let mut rom = Cartridge::from_file(bus.clone(), File::open(rom_path)?)?;
-        rom.load_prg();
-
-        let cpu = CPU::new(bus.clone());
-
-        Ok(NES { cpu, rom })
+        let cartridge = Cartridge::from_file(File::open(rom_path)?)?;
+        let cpu = CPU::new(Rc::new(RefCell::new(Bus::new(cartridge))));
+        Ok(NES { cpu })
     }
 }
 

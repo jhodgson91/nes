@@ -73,9 +73,8 @@ impl CPU {
     }
     //....	absolute	 	        OPC $LLHH	 	operand is address $HHLL *
     pub fn ab0(&mut self) {
-        let addr = self.bus.borrow().cpu_read::<u16>(self.pc);
+        self.oper = self.bus.borrow().cpu_read(self.pc);
         self.pc += 2;
-        self.oper = addr;
     }
     //....	absolute, X-indexed	 	OPC $LLHH,X	 	operand is address; effective address is address incremented by X with carry **
     pub fn abx(&mut self) {

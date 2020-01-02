@@ -28,13 +28,13 @@ impl CPU {
         self.sp = self.sp.wrapping_sub(2);
 
         // write status to stack and dec stack pointer
-        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.p);
+        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.st);
         self.sp = self.sp.wrapping_sub(1);
     }
 
     pub(super) fn pop_state(&mut self) {
         self.sp = self.sp.wrapping_add(1);
-        self.p = self.bus.borrow_mut().cpu_read(self.stack_addr());
+        self.st = self.bus.borrow_mut().cpu_read(self.stack_addr());
 
         self.sp = self.sp.wrapping_add(2);
         self.pc = self.bus.borrow().cpu_read(self.stack_addr());

@@ -20,7 +20,7 @@ pub struct CPU {
     x: u8,   // idx reg x
     y: u8,   // idx reg y
     a: u8,   // accumulator
-    p: u8,   // status
+    st: u8,  // status
 
     oper: u16, // Operand for the current instruction
 
@@ -41,11 +41,11 @@ impl CPU {
     const N: usize = 7; // Negative
 
     pub fn get_flag(&self, f: usize) -> bool {
-        self.p.get_bit(f)
+        self.st.get_bit(f)
     }
 
     pub fn set_flag(&mut self, f: usize, val: bool) {
-        self.p.set_bit(f, val);
+        self.st.set_bit(f, val);
     }
 
     pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
@@ -56,14 +56,19 @@ impl CPU {
             y: 0,
             a: 0,
             sp: 0xfd,
-            p: 0x34,
+            st: 0x34,
+
             oper: 0,
+
             interrupt_addr: None,
+
             instruction: Instruction::INVALID,
+
             bus,
         }
     }
 
+    /*
     pub fn reset(&mut self) {
         self.interrupt_addr = Some(0xfffc);
     }
@@ -80,6 +85,7 @@ impl CPU {
             self.interrupt_addr = Some(0xfffe);
         }
     }
+    */
 
     pub fn clock(&mut self) {
         if self.instruction.cycles == 0 {
@@ -96,7 +102,7 @@ impl CPU {
                 || self.instruction.operation == Operation::XXX
             {
                 println!(
-                    "Invalid instruction incoming at {:X} -- {:X}",
+                    "Invalid instruction incoming at ${:04X} -- ${:02X}",
                     self.pc, code
                 );
             }
@@ -105,10 +111,6 @@ impl CPU {
 
             (self.instruction.addr_mode.method())(self);
             (self.instruction.operation.method())(self);
-
-            println!("{}", self);
-            print!("{}[2J", 27 as char);
-            std::thread::sleep(std::time::Duration::from_millis(1));
         }
 
         self.instruction.cycles = self.instruction.cycles.saturating_sub(1);
@@ -151,7 +153,7 @@ impl Display for CPU {
         writeln!(fmt, "a:  {}", self.a)?;
         writeln!(fmt, "x:  {}", self.x)?;
         writeln!(fmt, "y:  {}", self.y)?;
-        writeln!(fmt, "p:  NV-BDIZC\n    {:08b}", self.p)?;
+        writeln!(fmt, "state:  NV-BDIZC\n        {:08b}", self.st)?;
         writeln!(fmt, "\ninstruction:")?;
         writeln!(fmt, "     code: ${:X}", self.instruction.code)?;
         writeln!(fmt, "       op: {:?}", self.instruction.operation)?;

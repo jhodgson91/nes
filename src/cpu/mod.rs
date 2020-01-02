@@ -12,9 +12,8 @@ use bit_field::BitField;
 use address_modes::AddressMode;
 use instructions::Operation;
 
-use super::Bus;
+use super::bus::Bus;
 
-#[derive(Debug)]
 pub struct CPU {
     pc: u16, // program counter
     sp: u8,  // stack ptr
@@ -50,7 +49,7 @@ impl CPU {
     }
 
     pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
-        let pc = bus.borrow().read_u16(0xfffc);
+        let pc = bus.borrow().cpu_read::<u16>(0xfffc);
         CPU {
             pc,
             x: 0,
@@ -87,15 +86,19 @@ impl CPU {
             if let Some(addr) = self.interrupt_addr {
                 self.set_flag(Self::I, true);
 
-                self.pc = self.bus.borrow().read_u16(addr);
+                self.pc = self.bus.borrow().cpu_read(addr);
             }
 
-            self.instruction = Self::INSTRUCTIONS[self.bus.borrow().read_u8(self.pc) as usize];
+            let code = self.bus.borrow().cpu_read::<u8>(self.pc);
+            self.instruction = Self::INSTRUCTIONS[code as usize];
 
             if self.instruction.addr_mode == AddressMode::XXX
                 || self.instruction.operation == Operation::XXX
             {
-                println!("Invalid instruction incoming at {:X}", self.pc);
+                println!(
+                    "Invalid instruction incoming at {:X} -- {:X}",
+                    self.pc, code
+                );
             }
 
             self.pc += 1;
@@ -108,7 +111,7 @@ impl CPU {
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
 
-        self.instruction.cycles -= 1;
+        self.instruction.cycles = self.instruction.cycles.saturating_sub(1);
     }
 
     /// invalid opcode found
@@ -121,7 +124,7 @@ impl CPU {
         match self.instruction.addr_mode {
             AddressMode::ACC => self.a,
             AddressMode::IMM => self.oper as u8,
-            _ => self.bus.borrow_mut().read_u8(self.oper),
+            _ => self.bus.borrow_mut().cpu_read(self.oper),
         }
     }
 
@@ -130,7 +133,7 @@ impl CPU {
         match self.instruction.addr_mode {
             AddressMode::ACC => self.a = v,
             AddressMode::IMM => (),
-            _ => self.bus.borrow_mut().write_u8(self.oper, v),
+            _ => self.bus.borrow_mut().cpu_write(self.oper, v),
         }
     }
 

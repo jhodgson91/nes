@@ -486,7 +486,7 @@ impl CPU {
         self.push_state();
         self.set_flag(Self::B, false);
 
-        self.pc = self.bus.borrow_mut().read_u16(0xfffe);
+        self.pc = self.bus.borrow_mut().cpu_read(0xfffe);
     }
     //	branch on overflow clear
     pub fn bvc(&mut self) {
@@ -557,7 +557,7 @@ impl CPU {
     }
     //	increment
     pub fn inc(&mut self) {
-        let m = self.bus.borrow().read_u8(self.oper).wrapping_add(1);
+        let m = self.bus.borrow().cpu_read::<u8>(self.oper).wrapping_add(1);
         self.set_flag(Self::Z, m == 0);
         self.set_flag(Self::N, m.get_bit(7));
         self.write_oper(m);
@@ -582,7 +582,7 @@ impl CPU {
     pub fn jsr(&mut self) {
         self.bus
             .borrow_mut()
-            .write_u16(self.stack_addr(), self.pc - 1);
+            .cpu_write(self.stack_addr(), self.pc - 1);
         self.sp = self.sp.wrapping_sub(2);
 
         self.pc = self.oper;
@@ -590,7 +590,7 @@ impl CPU {
     //	return from subroutine
     pub fn rts(&mut self) {
         self.sp = self.sp.wrapping_add(2);
-        self.pc = self.bus.borrow().read_u16(self.stack_addr()) + 1;
+        self.pc = self.bus.borrow().cpu_read::<u16>(self.stack_addr()) + 1;
     }
     //	load accumulator
     pub fn lda(&mut self) {
@@ -631,24 +631,24 @@ impl CPU {
     }
     //	push accumulator
     pub fn pha(&mut self) {
-        self.bus.borrow_mut().write_u8(self.stack_addr(), self.a);
+        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.a);
         self.sp = self.sp.wrapping_sub(1);
     }
     //	push processor status (SR)
     pub fn php(&mut self) {
-        self.bus.borrow_mut().write_u8(self.stack_addr(), self.p);
+        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.p);
         self.sp = self.sp.wrapping_sub(1);
     }
     //	pull accumulator
     pub fn pla(&mut self) {
-        self.a = self.bus.borrow().read_u8(self.stack_addr());
+        self.a = self.bus.borrow().cpu_read(self.stack_addr());
         self.set_flag(Self::Z, self.a != 0);
         self.set_flag(Self::N, self.a.get_bit(7));
         self.sp = self.sp.wrapping_add(1);
     }
     //	pull processor status (SR)
     pub fn plp(&mut self) {
-        self.p = self.bus.borrow().read_u8(self.stack_addr());
+        self.p = self.bus.borrow().cpu_read(self.stack_addr());
         self.sp = self.sp.wrapping_add(1);
     }
     //	rotate left
@@ -693,15 +693,15 @@ impl CPU {
     }
     //	store accumulator
     pub fn sta(&mut self) {
-        self.bus.borrow_mut().write_u8(self.oper, self.a);
+        self.bus.borrow_mut().cpu_write(self.oper, self.a);
     }
     //	store X
     pub fn stx(&mut self) {
-        self.bus.borrow_mut().write_u8(self.oper, self.x);
+        self.bus.borrow_mut().cpu_write(self.oper, self.x);
     }
     //	store Y
     pub fn sty(&mut self) {
-        self.bus.borrow_mut().write_u8(self.oper, self.y);
+        self.bus.borrow_mut().cpu_write(self.oper, self.y);
     }
     //	transfer accumulator to X
     pub fn tax(&mut self) {

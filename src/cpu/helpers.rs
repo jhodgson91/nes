@@ -24,19 +24,19 @@ impl CPU {
 
     pub(super) fn push_state(&mut self) {
         // Write program counter to stack and dec the stack pointer
-        self.bus.borrow_mut().write_u16(self.stack_addr(), self.pc);
+        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.pc);
         self.sp = self.sp.wrapping_sub(2);
 
         // write status to stack and dec stack pointer
-        self.bus.borrow_mut().write_u8(self.stack_addr(), self.p);
+        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.p);
         self.sp = self.sp.wrapping_sub(1);
     }
 
     pub(super) fn pop_state(&mut self) {
         self.sp = self.sp.wrapping_add(1);
-        self.p = self.bus.borrow_mut().read_u8(self.stack_addr());
+        self.p = self.bus.borrow_mut().cpu_read(self.stack_addr());
 
         self.sp = self.sp.wrapping_add(2);
-        self.pc = self.bus.borrow().read_u16(self.stack_addr());
+        self.pc = self.bus.borrow().cpu_read(self.stack_addr());
     }
 }

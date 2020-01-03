@@ -2,43 +2,42 @@ mod address_modes;
 mod helpers;
 mod instructions;
 
-pub use instructions::Instruction;
+pub use address_modes::AddressMode;
+pub use instructions::{Instruction, Operation};
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use bit_field::BitField;
 
-use address_modes::AddressMode;
-use instructions::Operation;
-
 use super::bus::Bus;
 
 pub struct CPU {
-    pc: u16, // program counter
-    sp: u8,  // stack ptr
-    x: u8,   // idx reg x
-    y: u8,   // idx reg y
-    a: u8,   // accumulator
-    st: u8,  // status
+    pub pc: u16, // program counter
+    pub sp: u8,  // stack ptr
+    pub x: u8,   // idx reg x
+    pub y: u8,   // idx reg y
+    pub a: u8,   // accumulator
+    pub st: u8,  // status
 
-    oper: u16, // Operand for the current instruction
+    pub oper: u16, // Operand for the current instruction
 
-    interrupt_addr: Option<u16>,
-    instruction: Instruction,
+    pub interrupt_addr: Option<u16>,
 
     bus: Rc<RefCell<Bus>>,
+
+    pub instruction: Instruction,
 }
 
 impl CPU {
     // Flags
-    const C: usize = 0; // Carry
-    const Z: usize = 1; // Zero
-    const I: usize = 2; // Interrupt
-    const D: usize = 3; // Decimal
-    const B: usize = 4; // Break
-    const V: usize = 6; // Overflow
-    const N: usize = 7; // Negative
+    pub const C: usize = 0; // Carry
+    pub const Z: usize = 1; // Zero
+    pub const I: usize = 2; // Interrupt
+    pub const D: usize = 3; // Decimal
+    pub const B: usize = 4; // Break
+    pub const V: usize = 6; // Overflow
+    pub const N: usize = 7; // Negative
 
     pub fn get_flag(&self, f: usize) -> bool {
         self.st.get_bit(f)

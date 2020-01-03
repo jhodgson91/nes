@@ -4,12 +4,13 @@ use std::io::{Seek, SeekFrom};
 
 pub struct Cartridge {
     pub sram: [u8; 8 * 1024],
+
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,
 }
 
 impl Cartridge {
-    pub fn from_file(mut file: File) -> std::io::Result<Self> {
+    pub fn from_nes(mut file: File) -> std::io::Result<Self> {
         let mut header = [0u8; 16];
         file.read_exact(&mut header).unwrap();
 

@@ -2,9 +2,9 @@ use super::cartridge::Cartridge;
 use num::PrimInt;
 
 pub struct Bus {
-    ram: [u8; 2 * 1024],    // 2KB internal ram
-    ppu_registers: [u8; 8], // 8-bytes of PPU registers
+    ram: [u8; 2 * 1024], // 2KB internal ram
 
+    ppu_registers: [u8; 8], // 8-bytes of PPU registers
     io_registers: [u8; 32], // 20 bytes of IO registers
 
     cartridge: Cartridge,

@@ -306,15 +306,17 @@ impl CPU {
     }
     //	jump subroutine
     fn jsr(&mut self) {
+        self.sp = self.sp.wrapping_sub(1);
         self.bus.borrow_mut().cpu_write(self.stack_addr(), self.pc);
-        self.sp = self.sp.wrapping_sub(2);
+        self.sp = self.sp.wrapping_sub(1);
 
         self.pc = self.oper;
     }
     //	return from subroutine
     fn rts(&mut self) {
-        self.sp = self.sp.wrapping_add(2);
+        self.sp = self.sp.wrapping_add(1);
         self.pc = self.bus.borrow().cpu_read::<u16>(self.stack_addr());
+        self.sp = self.sp.wrapping_add(1);
     }
     //	load accumulator
     fn lda(&mut self) {

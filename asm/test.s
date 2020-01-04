@@ -10,15 +10,27 @@ nmi:
 reset:
     cli
 
-    sed
-    sec
+    ldx #$ff
+    txs
+
     brk
+
+    jsr set
+    jsr clear
     jmp forever
 
 irq:
+    rti
+
+clear:
     clc
     cld
-    rti
+    rts
+
+set:
+    sec
+    sed
+    rts
 
 forever:
     jmp forever

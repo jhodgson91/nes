@@ -402,6 +402,8 @@ impl CPU {
     //	return from interrupt
     fn rti(&mut self) {
         self.pop_state();
+
+        self.set_flag(Self::B, false);
     }
     //	set carry
     fn sec(&mut self) {

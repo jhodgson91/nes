@@ -13,6 +13,7 @@ reset:
 
 test:
     lda #0
+    clc
     count_5:
         adc #1
         cmp #5
@@ -23,6 +24,7 @@ test:
 nmi:
 irq:
     lda #20
+    clc
     count_4:
         adc #1
         cmp #24

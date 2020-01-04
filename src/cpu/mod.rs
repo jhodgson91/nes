@@ -1,23 +1,20 @@
-mod address_modes;
-mod instructions;
+mod address_mode;
+mod instruction;
+mod operation;
 mod util;
 
-pub use address_modes::AddressMode;
-pub use instructions::{Instruction, Operation};
+pub use address_mode::AddressMode;
+pub use instruction::Instruction;
+pub use operation::Operation;
+
+use super::bus::Bus;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use bit_field::BitField;
 
-use super::bus::Bus;
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum Interrupt {
-    NMI = 0xfffa,
-    RES = 0xfffc,
-    IRQ = 0xfffe,
-}
+type Interrupt = (u16, u8);
 
 pub struct CPU {
     pub pc: u16, // program counter
@@ -38,6 +35,10 @@ pub struct CPU {
 }
 
 impl CPU {
+    const NMI: Interrupt = (0xfffa, 8);
+    const RES: Interrupt = (0xfffc, 8);
+    const IRQ: Interrupt = (0xfffe, 7);
+
     // Flags
     pub const C: usize = 0; // Carry
     pub const Z: usize = 1; // Zero
@@ -47,14 +48,6 @@ impl CPU {
     pub const U: usize = 5; // Unused
     pub const V: usize = 6; // Overflow
     pub const N: usize = 7; // Negative
-
-    pub fn get_flag(&self, f: usize) -> bool {
-        self.st.get_bit(f)
-    }
-
-    pub fn set_flag(&mut self, f: usize, val: bool) {
-        self.st.set_bit(f, val);
-    }
 
     pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
         let pc = bus.borrow().cpu_read::<u16>(0xfffc);
@@ -79,16 +72,16 @@ impl CPU {
     }
 
     pub fn reset(&mut self) {
-        self.interrupt = Some(Interrupt::RES);
+        self.interrupt = Some(Self::RES);
     }
 
     pub fn nmi(&mut self) {
-        self.interrupt = Some(Interrupt::NMI);
+        self.interrupt = Some(Self::NMI);
     }
 
     pub fn irq(&mut self) {
         if !self.get_flag(Self::I) {
-            self.interrupt = Some(Interrupt::IRQ);
+            self.interrupt = Some(Self::IRQ);
         }
     }
 
@@ -96,8 +89,8 @@ impl CPU {
         if self.cycles == 0 {
             match self.interrupt.take() {
                 // Reset behaves differently so prioritise that
-                Some(Interrupt::RES) => {
-                    self.pc = self.bus.borrow().cpu_read(Interrupt::RES as u16);
+                Some(Self::RES) => {
+                    self.pc = self.bus.borrow().cpu_read(Self::RES.0);
 
                     self.a = 0;
                     self.x = 0;
@@ -119,10 +112,8 @@ impl CPU {
 
                     self.set_flag(Self::I, true);
 
-                    self.pc = self.bus.borrow().cpu_read::<u16>(interrupt as u16);
-
-                    // NMI has one more cycle than IRQ
-                    self.cycles = if interrupt == Interrupt::NMI { 8 } else { 7 };
+                    self.pc = self.bus.borrow().cpu_read::<u16>(interrupt.0);
+                    self.cycles = interrupt.1;
                 }
                 _ => {
                     let code = self.bus.borrow().cpu_read::<u8>(self.pc);
@@ -147,9 +138,16 @@ impl CPU {
         self.cycles = self.cycles.saturating_sub(1);
     }
 
-    /// invalid opcode found
-    pub fn xxx(&mut self) {
-        panic!("Unsupported instruction!")
+    pub fn stack_addr(&self) -> u16 {
+        0x100u16 + self.sp as u16
+    }
+
+    pub fn get_flag(&self, f: usize) -> bool {
+        self.st.get_bit(f)
+    }
+
+    fn set_flag(&mut self, f: usize, val: bool) {
+        self.st.set_bit(f, val);
     }
 
     /// Reads the operand according to address mode
@@ -170,8 +168,9 @@ impl CPU {
         }
     }
 
-    pub fn stack_addr(&self) -> u16 {
-        0x100u16 + self.sp as u16
+    /// invalid opcode found
+    fn xxx(&mut self) {
+        panic!("Unsupported instruction!")
     }
 }
 

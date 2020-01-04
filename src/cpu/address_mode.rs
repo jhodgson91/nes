@@ -64,14 +64,14 @@ impl CPU {
     // The CPU has already read and incremented pc for the opcode
 
     //....	zeropage	 	        OPC $LL	 	    operand is zeropage address (hi-byte is zero, address = $00LL)
-    pub fn zp0(&mut self) {
+    fn zp0(&mut self) {
         let addr = self.bus.borrow().cpu_read::<u8>(self.pc) as u16;
         self.pc += 1;
 
         self.oper = addr;
     }
     //....	zeropage, X-indexed	 	OPC $LL,X	 	operand is zeropage address; effective address is address incremented by X without carry **
-    pub fn zpx(&mut self) {
+    fn zpx(&mut self) {
         let addr = (self
             .bus
             .borrow()
@@ -81,7 +81,7 @@ impl CPU {
         self.oper = addr;
     }
     //....	zeropage, Y-indexed	 	OPC $LL,Y	 	operand is zeropage address; effective address is address incremented by Y without carry **
-    pub fn zpy(&mut self) {
+    fn zpy(&mut self) {
         let addr = (self
             .bus
             .borrow()
@@ -91,12 +91,12 @@ impl CPU {
         self.oper = addr;
     }
     //....	absolute	 	        OPC $LLHH	 	operand is address $HHLL *
-    pub fn ab0(&mut self) {
+    fn ab0(&mut self) {
         self.oper = self.bus.borrow().cpu_read(self.pc);
         self.pc += 2;
     }
     //....	absolute, X-indexed	 	OPC $LLHH,X	 	operand is address; effective address is address incremented by X with carry **
-    pub fn abx(&mut self) {
+    fn abx(&mut self) {
         let ptr = self.bus.borrow().cpu_read::<u16>(self.pc);
         self.pc += 2;
         let addr = ptr + self.x as u16;
@@ -105,7 +105,7 @@ impl CPU {
         self.oper = addr;
     }
     //....	absolute, Y-indexed	 	OPC $LLHH,Y	 	operand is address; effective address is address incremented by Y with carry **
-    pub fn aby(&mut self) {
+    fn aby(&mut self) {
         let ptr = self.bus.borrow().cpu_read::<u16>(self.pc);
         self.pc += 2;
         let addr = ptr + self.y as u16;
@@ -114,18 +114,18 @@ impl CPU {
         self.oper = addr;
     }
     //....	Accumulator	 	        OPC A	 	    operand is AC (implied single byte instruction)
-    pub fn acc(&mut self) {
+    fn acc(&mut self) {
         self.oper = self.a as u16;
     }
     //....	immediate	 	        OPC #$BB	 	operand is byte BB
-    pub fn imm(&mut self) {
+    fn imm(&mut self) {
         self.oper = self.bus.borrow().cpu_read::<u8>(self.pc) as u16;
         self.pc += 1;
     }
     //....	implied	 	            OPC	 	        operand implied
-    pub fn imp(&mut self) {}
+    fn imp(&mut self) {}
     //....	indirect	 	        OPC ($LLHH)	 	operand is address; effective address is contents of word at address: C.w($HHLL)
-    pub fn id0(&mut self) {
+    fn id0(&mut self) {
         self.oper = self
             .bus
             .borrow()
@@ -133,7 +133,7 @@ impl CPU {
         self.pc += 2;
     }
     //....	X-indexed, indirect	 	OPC ($LL,X)	 	operand is zeropage address; effective address is word in (LL + X, LL + X + 1), inc. without carry: C.w($00LL + X)
-    pub fn idx(&mut self) {
+    fn idx(&mut self) {
         let ptr = self
             .bus
             .borrow()
@@ -143,7 +143,7 @@ impl CPU {
         self.pc += 1;
     }
     //....	indirect, Y-indexed	 	OPC ($LL),Y	 	operand is zeropage address; effective address is word in (LL, LL + 1) incremented by Y with carry: C.w($00LL) + Y
-    pub fn idy(&mut self) {
+    fn idy(&mut self) {
         let ptr = self.bus.borrow().cpu_read::<u8>(self.pc) as u16;
         self.pc += 1;
 
@@ -159,7 +159,7 @@ impl CPU {
         };
     }
     //....	relative	 	        OPC $BB	 	    branch target is PC + signed offset BB ***
-    pub fn rel(&mut self) {
+    fn rel(&mut self) {
         self.oper = self.bus.borrow().cpu_read::<u8>(self.pc) as u16;
         if self.oper.get_bit(7) {
             self.oper |= 0xff00;

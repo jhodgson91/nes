@@ -50,14 +50,21 @@ impl NES {
 
         let bus = self.bus.borrow();
 
-        for r in 0..rows {
-            Text::new(format!("${:04X}: ", addr)).draw(
+        for i in 0..cols {
+            Text::new(format!("{:02X}", i)).draw(
+                ctx,
+                DrawParam::new().dest([pos[0] + 60.0 + (SPACE * i as f32), pos[1]]),
+            )?;
+        }
+
+        for r in 1..rows + 1 {
+            Text::new(format!("${:04X}:", addr)).draw(
                 ctx,
                 DrawParam::default().dest([pos[0], pos[1] + (LINE * r as f32)]),
             )?;
 
             for c in 0..cols {
-                Text::new(format!(" {:02X} ", bus.cpu_read::<u8>(addr))).draw(
+                Text::new(format!("{:02X} ", bus.cpu_read::<u8>(addr))).draw(
                     ctx,
                     DrawParam::new().dest([
                         pos[0] + 60.0 + (SPACE * c as f32),
@@ -160,7 +167,7 @@ impl NES {
         draw_two_col!(
             "SP:",
             Text::new(format!(
-                "${:02X} [{:04X}]",
+                "${:02X} [${:04X}]",
                 self.cpu.sp,
                 self.cpu.stack_addr()
             )),
@@ -181,7 +188,7 @@ impl EventHandler for NES {
             }
             RunState::Break => (),
             RunState::Step => {
-                while self.cpu.instruction.cycles > 0 {
+                while self.cpu.cycles > 0 {
                     self.cpu.clock()
                 }
                 self.cpu.clock();
@@ -194,7 +201,8 @@ impl EventHandler for NES {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, graphics::Color::new(0.1, 0.1, 0.7, 1.0));
-        self.draw_bus(ctx, 0x00, 16, 16, [0.0, 0.0])?;
+        self.draw_bus(ctx, 0x1f0, 1, 16, [0.0, 0.0])?;
+        self.draw_bus(ctx, 0x0, 2, 16, [0.0, 100.0])?;
         self.draw_cpu(ctx, [550.0, 0.0])?;
         self.draw_code(ctx, [550.0, 150.0])?;
         graphics::present(ctx)?;
@@ -210,7 +218,25 @@ impl EventHandler for NES {
     ) {
         match keycode {
             KeyCode::B => self.run_state = RunState::Break,
+            KeyCode::Space => {
+                if self.run_state == RunState::Break {
+                    self.run_state = RunState::Step;
+                }
+            }
+            KeyCode::I => {
+                self.cpu.irq();
+                if self.run_state == RunState::Break {
+                    self.run_state = RunState::Step;
+                }
+            }
             KeyCode::N => {
+                self.cpu.nmi();
+                if self.run_state == RunState::Break {
+                    self.run_state = RunState::Step;
+                }
+            }
+            KeyCode::R => {
+                self.cpu.reset();
                 if self.run_state == RunState::Break {
                     self.run_state = RunState::Step;
                 }

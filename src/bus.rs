@@ -72,12 +72,10 @@ impl Bus {
 
     fn write<U: PrimInt>(addr: u16, to: &mut [u8], data: U) {
         let addr = addr as usize;
+        let data = data.to_le();
         let sl = unsafe {
             // SAFETY - Known size of U guarantees we read and write only size_of<U> bytes
-            std::slice::from_raw_parts(
-                &data.to_le() as *const U as *const u8,
-                std::mem::size_of::<U>(),
-            )
+            std::slice::from_raw_parts(&data as *const U as *const u8, std::mem::size_of::<U>())
         };
         (&mut to[addr..addr + std::mem::size_of::<U>()]).copy_from_slice(&sl);
     }

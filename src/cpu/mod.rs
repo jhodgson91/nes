@@ -12,6 +12,13 @@ use bit_field::BitField;
 
 use super::bus::Bus;
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum Interrupt {
+    NMI = 0xfffa,
+    RES = 0xfffc,
+    IRQ = 0xfffe,
+}
+
 pub struct CPU {
     pub pc: u16, // program counter
     pub sp: u8,  // stack ptr
@@ -22,11 +29,12 @@ pub struct CPU {
 
     pub oper: u16, // Operand for the current instruction
 
-    pub interrupt_addr: Option<u16>,
+    pub instruction: &'static Instruction,
+    pub cycles: u8,
+
+    interrupt: Option<Interrupt>,
 
     bus: Rc<RefCell<Bus>>,
-
-    pub instruction: Instruction,
 }
 
 impl CPU {
@@ -36,6 +44,7 @@ impl CPU {
     pub const I: usize = 2; // Interrupt
     pub const D: usize = 3; // Decimal
     pub const B: usize = 4; // Break
+    pub const U: usize = 5; // Unused
     pub const V: usize = 6; // Overflow
     pub const N: usize = 7; // Negative
 
@@ -57,62 +66,85 @@ impl CPU {
             sp: 0xfd,
             st: 0x34,
 
+            cycles: 0,
+
             oper: 0,
 
-            interrupt_addr: None,
+            interrupt: None,
 
-            instruction: Instruction::INVALID,
+            instruction: &Instruction::INVALID,
 
             bus,
         }
     }
 
-    /*
     pub fn reset(&mut self) {
-        self.interrupt_addr = Some(0xfffc);
+        self.interrupt = Some(Interrupt::RES);
     }
+
     pub fn nmi(&mut self) {
-        self.set_flag(Self::B, false);
-        self.push_state();
-        self.interrupt_addr = Some(0xfffa);
+        self.interrupt = Some(Interrupt::NMI);
     }
 
     pub fn irq(&mut self) {
         if !self.get_flag(Self::I) {
-            self.set_flag(Self::B, false);
-            self.push_state();
-            self.interrupt_addr = Some(0xfffe);
+            self.interrupt = Some(Interrupt::IRQ);
         }
     }
-    */
 
     pub fn clock(&mut self) {
-        if self.instruction.cycles == 0 {
-            if let Some(addr) = self.interrupt_addr {
-                self.set_flag(Self::I, true);
+        if self.cycles == 0 {
+            match self.interrupt.take() {
+                // Reset behaves differently so prioritise that
+                Some(Interrupt::RES) => {
+                    self.pc = self.bus.borrow().cpu_read(Interrupt::RES as u16);
 
-                self.pc = self.bus.borrow().cpu_read(addr);
+                    self.a = 0;
+                    self.x = 0;
+                    self.y = 0;
+                    self.sp = 0xfd;
+                    self.st = 0x34;
+
+                    self.oper = 0;
+                    self.instruction = &Instruction::INVALID;
+
+                    self.cycles = 8;
+                }
+                // IRQ and NMI behave the same
+                Some(interrupt) => {
+                    self.set_flag(Self::U, true);
+                    self.set_flag(Self::B, false);
+
+                    self.push_state();
+
+                    self.set_flag(Self::I, true);
+
+                    self.pc = self.bus.borrow().cpu_read::<u16>(interrupt as u16);
+
+                    // NMI has one more cycle than IRQ
+                    self.cycles = if interrupt == Interrupt::NMI { 8 } else { 7 };
+                }
+                _ => {
+                    let code = self.bus.borrow().cpu_read::<u8>(self.pc);
+                    self.instruction = &Self::INSTRUCTIONS[code as usize];
+                    self.cycles = self.instruction.cycles;
+
+                    if !self.instruction.is_valid() {
+                        println!(
+                            "Invalid instruction incoming at ${:04X} -- code: ${:02X}",
+                            self.pc, code
+                        );
+                    }
+
+                    self.pc += 1;
+
+                    (self.instruction.addr_mode.method())(self);
+                    (self.instruction.operation.method())(self);
+                }
             }
-
-            let code = self.bus.borrow().cpu_read::<u8>(self.pc);
-            self.instruction = Self::INSTRUCTIONS[code as usize];
-
-            if self.instruction.addr_mode == AddressMode::XXX
-                || self.instruction.operation == Operation::XXX
-            {
-                println!(
-                    "Invalid instruction incoming at ${:04X} -- ${:02X}",
-                    self.pc, code
-                );
-            }
-
-            self.pc += 1;
-
-            (self.instruction.addr_mode.method())(self);
-            (self.instruction.operation.method())(self);
         }
 
-        self.instruction.cycles = self.instruction.cycles.saturating_sub(1);
+        self.cycles = self.cycles.saturating_sub(1);
     }
 
     /// invalid opcode found
@@ -164,7 +196,7 @@ impl Display for CPU {
             _ => writeln!(fmt, "     oper: ${:04X}", self.oper)?,
         };
 
-        writeln!(fmt, "   cycles: {}", self.instruction.cycles)?;
+        writeln!(fmt, "   cycles: {}", self.cycles)?;
         Ok(())
     }
 }

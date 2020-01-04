@@ -8,12 +8,16 @@ impl CPU {
         let bus = self.bus.borrow();
         let mut res = Vec::new();
 
-        while pc <= to as u32 {
+        while pc < to as u32 {
             let line_addr = pc as u16;
 
             let mut s = format!("${:04X}: ", pc);
             let instruction = Self::INSTRUCTIONS[bus.cpu_read::<u8>(pc as u16) as usize];
             pc += 1;
+
+            if ((to - instruction.addr_mode.operand_size() as u16) as u32) < pc {
+                break;
+            }
 
             s += &format!("{:?} ", instruction.operation);
             match instruction.addr_mode {
@@ -84,11 +88,11 @@ impl CPU {
 
     pub(super) fn branch_on_condition(&mut self, cond: bool, addr: u16) {
         if cond {
-            self.instruction.cycles += 1;
+            self.cycles += 1;
 
             let addr = self.pc.wrapping_add(addr);
             if addr & 0xff00 != self.pc & 0xff00 {
-                self.instruction.cycles += 1;
+                self.cycles += 1;
             }
 
             self.pc = addr;

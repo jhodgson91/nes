@@ -153,6 +153,10 @@ impl Instruction {
         addr_mode: AddressMode::XXX,
         cycles: 0,
     };
+
+    pub fn is_valid(&self) -> bool {
+        !(self.addr_mode == AddressMode::XXX || self.operation == Operation::XXX)
+    }
 }
 
 impl CPU {
@@ -481,10 +485,12 @@ impl CPU {
     //  break / interrupt
     pub fn brk(&mut self) {
         // Set break flag
+        self.set_flag(Self::U, true);
         self.set_flag(Self::B, true);
-        self.set_flag(Self::I, true);
+
         self.push_state();
-        self.set_flag(Self::B, false);
+
+        self.set_flag(Self::I, true);
 
         self.pc = self.bus.borrow_mut().cpu_read(0xfffe);
     }
@@ -514,21 +520,15 @@ impl CPU {
     }
     //	compare (with accumulator)
     pub fn cmp(&mut self) {
-        let lhs = self.a;
-        let rhs = self.read_oper();
-        self.compare(lhs, rhs);
+        self.compare(self.a, self.read_oper());
     }
     //	compare with X
     pub fn cpx(&mut self) {
-        let lhs = self.x;
-        let rhs = self.read_oper();
-        self.compare(lhs, rhs);
+        self.compare(self.x, self.read_oper());
     }
     //	compare with Y
     pub fn cpy(&mut self) {
-        let lhs = self.y;
-        let rhs = self.read_oper();
-        self.compare(lhs, rhs);
+        self.compare(self.y, self.read_oper());
     }
     //	decrement
     pub fn dec(&mut self) {
@@ -580,9 +580,7 @@ impl CPU {
     }
     //	jump subroutine
     pub fn jsr(&mut self) {
-        self.bus
-            .borrow_mut()
-            .cpu_write(self.stack_addr(), self.pc - 1);
+        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.pc);
         self.sp = self.sp.wrapping_sub(2);
 
         self.pc = self.oper;
@@ -590,7 +588,7 @@ impl CPU {
     //	return from subroutine
     pub fn rts(&mut self) {
         self.sp = self.sp.wrapping_add(2);
-        self.pc = self.bus.borrow().cpu_read::<u16>(self.stack_addr()) + 1;
+        self.pc = self.bus.borrow().cpu_read::<u16>(self.stack_addr());
     }
     //	load accumulator
     pub fn lda(&mut self) {
@@ -636,6 +634,9 @@ impl CPU {
     }
     //	push processor status (SR)
     pub fn php(&mut self) {
+        self.set_flag(Self::U, true);
+        self.set_flag(Self::B, true);
+
         self.bus.borrow_mut().cpu_write(self.stack_addr(), self.st);
         self.sp = self.sp.wrapping_sub(1);
     }

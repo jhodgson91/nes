@@ -2,22 +2,32 @@
 .segment "HEADER"
     .byte "NES",26,2,1 ; 32K PRG, 8K CHR
 .segment "VECTORS"
-    .word 0, reset, 0
+    .word nmi, reset, irq
 .segment "STARTUP" ; avoids warning
 .segment "CODE"
 
 reset:
+    cli
     jsr test
     jmp forever
 
 test:
     lda #0
-    loop:
+    count_5:
         adc #1
-        cmp #10
-        bne loop
+        cmp #5
+        bne count_5
+        sta $0000
+
     rts
 nmi:
 irq:
+    lda #20
+    count_4:
+        adc #1
+        cmp #24
+        bne count_4
+    sta $0001
+    rti
 forever:
     jmp forever

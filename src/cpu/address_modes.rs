@@ -38,6 +38,25 @@ impl AddressMode {
             AddressMode::XXX => CPU::xxx,
         }
     }
+
+    pub fn operand_size(&self) -> u8 {
+        match self {
+            AddressMode::ACC => 0,
+            AddressMode::AB0 => 2,
+            AddressMode::ABX => 2,
+            AddressMode::ABY => 2,
+            AddressMode::IMM => 1,
+            AddressMode::IMP => 0,
+            AddressMode::ID0 => 2,
+            AddressMode::IDX => 1,
+            AddressMode::IDY => 1,
+            AddressMode::REL => 1,
+            AddressMode::ZP0 => 1,
+            AddressMode::ZPX => 1,
+            AddressMode::ZPY => 1,
+            AddressMode::XXX => 0,
+        }
+    }
 }
 
 impl CPU {
@@ -82,7 +101,7 @@ impl CPU {
         self.pc += 2;
         let addr = ptr + self.x as u16;
 
-        self.instruction.cycles = if addr & 0xff00 == ptr & 0xff00 { 0 } else { 1 };
+        self.cycles += if addr & 0xff00 == ptr & 0xff00 { 0 } else { 1 };
         self.oper = addr;
     }
     //....	absolute, Y-indexed	 	OPC $LLHH,Y	 	operand is address; effective address is address incremented by Y with carry **
@@ -91,7 +110,7 @@ impl CPU {
         self.pc += 2;
         let addr = ptr + self.y as u16;
 
-        self.instruction.cycles = if addr & 0xff00 == ptr & 0xff00 { 0 } else { 1 };
+        self.cycles += if addr & 0xff00 == ptr & 0xff00 { 0 } else { 1 };
         self.oper = addr;
     }
     //....	Accumulator	 	        OPC A	 	    operand is AC (implied single byte instruction)
@@ -133,7 +152,7 @@ impl CPU {
             .borrow()
             .cpu_read::<u16>(ptr)
             .wrapping_add(self.y as u16);
-        self.instruction.cycles += if ptr & 0xff00 == self.oper & 0xff00 {
+        self.cycles += if ptr & 0xff00 == self.oper & 0xff00 {
             0
         } else {
             1

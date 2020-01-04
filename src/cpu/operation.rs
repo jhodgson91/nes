@@ -163,7 +163,7 @@ impl CPU {
     }
     //	and (with accumulator)
     fn and(&mut self) {
-        self.a &= self.oper as u8;
+        self.a &= self.read_oper();
         self.set_flag(Self::Z, self.a == 0);
         self.set_flag(Self::N, self.a.get_bit(7));
     }

@@ -28,11 +28,10 @@ enum RunState {
 }
 
 struct NES {
+    cpu: CPU,
+    bus: Rc<RefCell<Bus>>,
+
     run_state: RunState,
-
-    pub cpu: CPU,
-    pub bus: Rc<RefCell<Bus>>,
-
     disassembly: Vec<(u16, String)>,
 }
 

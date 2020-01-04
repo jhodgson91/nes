@@ -6,30 +6,18 @@
 .segment "STARTUP" ; avoids warning
 .segment "CODE"
 
+nmi:
+irq:
 reset:
     cli
     jsr test
     jmp forever
 
 test:
-    lda #0
-    clc
-    count_5:
-        adc #1
-        cmp #5
-        bne count_5
-        sta $0000
-
+    lda #$f0
+    sta $0000
+    lda #$0f
+    eor $0000
     rts
-nmi:
-irq:
-    lda #20
-    clc
-    count_4:
-        adc #1
-        cmp #24
-        bne count_4
-    sta $0001
-    rti
 forever:
     jmp forever

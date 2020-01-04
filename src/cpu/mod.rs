@@ -155,7 +155,7 @@ impl CPU {
         match self.instruction.addr_mode {
             AddressMode::ACC => self.a,
             AddressMode::IMM => self.oper as u8,
-            _ => self.bus.borrow_mut().cpu_read(self.oper),
+            _ => self.bus.borrow().cpu_read(self.oper),
         }
     }
 

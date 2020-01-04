@@ -1,6 +1,6 @@
 mod address_modes;
-mod helpers;
 mod instructions;
+mod util;
 
 pub use address_modes::AddressMode;
 pub use instructions::{Instruction, Operation};
@@ -138,7 +138,7 @@ impl CPU {
         }
     }
 
-    fn stack_addr(&self) -> u16 {
+    pub fn stack_addr(&self) -> u16 {
         0x100u16 + self.sp as u16
     }
 }

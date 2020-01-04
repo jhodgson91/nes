@@ -13,9 +13,8 @@ use std::convert::AsRef;
 use std::fs::File;
 use std::path::Path;
 
-use ggez::conf::WindowSetup;
 use ggez::event::{self, EventHandler, KeyCode};
-use ggez::graphics::{self, Color, DrawParam, Drawable, Text, TextFragment};
+use ggez::graphics::{self, DrawParam, Drawable, Text, TextFragment};
 use ggez::input::keyboard::KeyMods;
 use ggez::{Context, ContextBuilder, GameResult};
 
@@ -32,37 +31,87 @@ struct NES {
     run_state: RunState,
 
     pub cpu: CPU,
+    pub bus: Rc<RefCell<Bus>>,
+
+    disassembly: Vec<(u16, String)>,
 }
 
-pub const RED: Color = Color {
-    r: 1.0,
-    g: 0.0,
-    b: 0.0,
-    a: 1.0,
-};
-
-pub const GREEN: Color = Color {
-    r: 0.0,
-    g: 1.0,
-    b: 0.0,
-    a: 1.0,
-};
-
 impl NES {
+    fn draw_bus(
+        &self,
+        ctx: &mut Context,
+        mut addr: u16,
+        rows: u8,
+        cols: u8,
+        pos: [f32; 2],
+    ) -> GameResult<()> {
+        const LINE: f32 = 20.0;
+        const SPACE: f32 = 25.0;
+
+        let bus = self.bus.borrow();
+
+        for r in 0..rows {
+            Text::new(format!("${:04X}: ", addr)).draw(
+                ctx,
+                DrawParam::default().dest([pos[0], pos[1] + (LINE * r as f32)]),
+            )?;
+
+            for c in 0..cols {
+                Text::new(format!(" {:02X} ", bus.cpu_read::<u8>(addr))).draw(
+                    ctx,
+                    DrawParam::new().dest([
+                        pos[0] + 60.0 + (SPACE * c as f32),
+                        pos[1] + (LINE * r as f32),
+                    ]),
+                )?;
+                addr += 1;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn draw_code(&self, ctx: &mut Context, pos: [f32; 2]) -> GameResult<()> {
+        let idx = self
+            .disassembly
+            .iter()
+            .position(|(pc, _)| *pc == self.cpu.pc)
+            .ok_or(ggez::GameError::RenderError(format!(
+                "Disassembly does not contain pc {:04X}",
+                self.cpu.pc
+            )))?;
+
+        for (i, entry) in self.disassembly[idx.saturating_sub(10)..idx.saturating_add(10)]
+            .iter()
+            .enumerate()
+        {
+            let mut t = TextFragment::new(entry.1.clone());
+            if entry.0 == self.cpu.pc {
+                t = t.color([0.0, 1.0, 0.0, 1.0].into());
+            }
+
+            Text::new(t).draw(
+                ctx,
+                DrawParam::new().dest([pos[0], pos[1] + i as f32 * 20.0]),
+            )?;
+        }
+
+        Ok(())
+    }
+
     fn draw_cpu(&self, ctx: &mut Context, pos: [f32; 2]) -> GameResult<()> {
         const LINE_HEIGHT: f32 = 20.0;
         let col1 = pos[0];
-        let col2 = pos[0] + 100.0;
+        let col2 = pos[0] + 80.0;
 
-        macro_rules! flags_text {
-            ($($f: ident),*) => {{
-                let mut t = Text::default();
-                $(
-                    let frag = TextFragment::new(stringify!($f)).color(if self.cpu.get_flag(CPU::$f) {GREEN} else {RED});
-                    t.add(frag);
-                )*
-                t
-            }};
+        macro_rules! flag_text {
+            ($f: ident) => {
+                TextFragment::new(stringify!($f)).color(if self.cpu.get_flag(CPU::$f) {
+                    [0.0, 1.0, 0.0, 1.0].into()
+                } else {
+                    [1.0, 0.0, 0.0, 1.0].into()
+                });
+            };
         }
 
         macro_rules! draw_two_col {
@@ -78,7 +127,20 @@ impl NES {
             };
         }
 
-        draw_two_col!("Status:", flags_text!(N, V, B, D, I, Z, C), 0);
+        let flags = {
+            let mut res = Text::default();
+            res.add(flag_text!(N));
+            res.add(TextFragment::new("-"));
+            res.add(flag_text!(V));
+            res.add(flag_text!(B));
+            res.add(flag_text!(D));
+            res.add(flag_text!(I));
+            res.add(flag_text!(Z));
+            res.add(flag_text!(C));
+            res
+        };
+
+        draw_two_col!("Status:", flags, 0);
         draw_two_col!("PC:", Text::new(format!("${:04X}", self.cpu.pc)), 1);
         draw_two_col!(
             "A:",
@@ -95,6 +157,15 @@ impl NES {
             Text::new(format!("${:02X}  [{:03}]", self.cpu.y, self.cpu.y)),
             4
         );
+        draw_two_col!(
+            "SP:",
+            Text::new(format!(
+                "${:02X} [{:04X}]",
+                self.cpu.sp,
+                self.cpu.stack_addr()
+            )),
+            5
+        );
 
         Ok(())
     }
@@ -104,21 +175,16 @@ impl EventHandler for NES {
     fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
         match self.run_state {
             RunState::Run => {
-                let mut cycles = 0;
-
-                // TODO - Incorrect, need to run as many cycles as fit into the frame!
-                // Does for now. We start in the Break state so this doesn't run immediately!
-                while cycles < CPU_HZ {
+                for _i in 0..CPU_HZ / 60 {
                     self.cpu.clock();
-                    cycles += 1;
                 }
             }
             RunState::Break => (),
             RunState::Step => {
-                self.cpu.clock();
                 while self.cpu.instruction.cycles > 0 {
                     self.cpu.clock()
                 }
+                self.cpu.clock();
 
                 self.run_state = RunState::Break;
             }
@@ -128,7 +194,9 @@ impl EventHandler for NES {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, graphics::Color::new(0.1, 0.1, 0.7, 1.0));
-        self.draw_cpu(ctx, [600.0, 0.0])?;
+        self.draw_bus(ctx, 0x00, 16, 16, [0.0, 0.0])?;
+        self.draw_cpu(ctx, [550.0, 0.0])?;
+        self.draw_code(ctx, [550.0, 150.0])?;
         graphics::present(ctx)?;
         Ok(())
     }
@@ -156,23 +224,21 @@ impl EventHandler for NES {
 impl NES {
     fn new<P: AsRef<Path>>(rom_path: P) -> std::io::Result<Self> {
         let cartridge = Cartridge::from_nes(File::open(rom_path)?)?;
-        let cpu = CPU::new(Rc::new(RefCell::new(Bus::new(cartridge))));
+        let bus = Rc::new(RefCell::new(Bus::new(cartridge)));
+        let cpu = CPU::new(bus.clone());
+
         Ok(NES {
+            disassembly: cpu.disassemble(0x0000, 0xffff),
             run_state: RunState::Break,
             cpu,
+            bus,
         })
     }
 }
 
 fn main() -> std::io::Result<()> {
-    let mut nes = NES::new("/home/james/Projects/rust/nes/roms/implied.nes")?;
-    let (mut ctx, mut event_loop) = ContextBuilder::new("NES", "jhodgson")
-        .window_setup(WindowSetup {
-            vsync: false,
-            ..Default::default()
-        })
-        .build()
-        .unwrap();
+    let mut nes = NES::new("/home/james/Projects/rust/nes/roms/test.nes")?;
+    let (mut ctx, mut event_loop) = ContextBuilder::new("NES", "jhodgson").build().unwrap();
 
     match event::run(&mut ctx, &mut event_loop, &mut nes) {
         Ok(_) => (),

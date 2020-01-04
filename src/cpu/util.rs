@@ -106,11 +106,11 @@ impl CPU {
     }
 
     pub(super) fn push_state(&mut self) {
-        // Write program counter to stack and dec the stack pointer
+        // PC should be written to the sp and one before, so dec first, then write u16, then dec
+        self.sp = self.sp.wrapping_sub(1);
         self.bus.borrow_mut().cpu_write(self.stack_addr(), self.pc);
-        self.sp = self.sp.wrapping_sub(2);
+        self.sp = self.sp.wrapping_sub(1);
 
-        // write status to stack and dec stack pointer
         self.bus.borrow_mut().cpu_write(self.stack_addr(), self.st);
         self.sp = self.sp.wrapping_sub(1);
     }
@@ -119,7 +119,8 @@ impl CPU {
         self.sp = self.sp.wrapping_add(1);
         self.st = self.bus.borrow_mut().cpu_read(self.stack_addr());
 
-        self.sp = self.sp.wrapping_add(2);
+        self.sp = self.sp.wrapping_add(1);
         self.pc = self.bus.borrow().cpu_read(self.stack_addr());
+        self.sp = self.sp.wrapping_add(1);
     }
 }

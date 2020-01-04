@@ -7,17 +7,18 @@
 .segment "CODE"
 
 nmi:
-irq:
 reset:
     cli
-    jsr test
+
+    sed
+    sec
+    brk
     jmp forever
 
-test:
-    lda #$f0
-    sta $0000
-    lda #$0f
-    eor $0000
-    rts
+irq:
+    clc
+    cld
+    rti
+
 forever:
     jmp forever

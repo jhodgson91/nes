@@ -358,25 +358,22 @@ impl CPU {
         self.bus.borrow_mut().cpu_write(self.stack_addr(), self.a);
         self.sp = self.sp.wrapping_sub(1);
     }
-    //	push processor status (SR)
-    fn php(&mut self) {
-        self.set_flag(Self::U, true);
-        self.set_flag(Self::B, true);
-
-        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.st);
-        self.sp = self.sp.wrapping_sub(1);
-    }
     //	pull accumulator
     fn pla(&mut self) {
+        self.sp = self.sp.wrapping_add(1);
         self.a = self.bus.borrow().cpu_read(self.stack_addr());
         self.set_flag(Self::Z, self.a != 0);
         self.set_flag(Self::N, self.a.get_bit(7));
-        self.sp = self.sp.wrapping_add(1);
+    }
+    //	push processor status (SR)
+    fn php(&mut self) {
+        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.st);
+        self.sp = self.sp.wrapping_sub(1);
     }
     //	pull processor status (SR)
     fn plp(&mut self) {
-        self.st = self.bus.borrow().cpu_read(self.stack_addr());
         self.sp = self.sp.wrapping_add(1);
+        self.st = self.bus.borrow().cpu_read(self.stack_addr());
     }
     //	rotate left
     fn rol(&mut self) {

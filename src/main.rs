@@ -136,7 +136,7 @@ impl NES {
         let flags = {
             let mut res = Text::default();
             res.add(flag_text!(N));
-            res.add(TextFragment::new("-"));
+            res.add(flag_text!(U));
             res.add(flag_text!(V));
             res.add(flag_text!(B));
             res.add(flag_text!(D));

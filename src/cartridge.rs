@@ -14,7 +14,7 @@ bitfield! {
     u16, prg_size_lsb, _: 39, 32;
     u16, chr_size_lsb, _: 47, 40;
 
-    pub mirroring, _: 48;
+    pub mirror_mode, _: 48;
     pub has_battery_mem, _: 89;
     pub has_trainer, _: 50;
     pub four_screen_mode, _: 51;
@@ -53,6 +53,8 @@ impl<T: AsMut<[u8]> + AsRef<[u8]>> Header<T> {
 }
 
 pub struct Cartridge {
+    pub header: Header<[u8; 16]>,
+
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,
 
@@ -91,6 +93,7 @@ impl Cartridge {
         };
 
         Ok(Cartridge {
+            header,
             sram: [0; 8 * 1024],
             prg_rom,
             chr_rom,
@@ -99,6 +102,7 @@ impl Cartridge {
 
     pub fn cpu_map(&self, addr: u16) -> u16 {
         match addr {
+            0x4020..=0x7fff => addr - 0x4020,
             0x8000..=0xffff => {
                 addr & match self.prg_size() {
                     2 => 0x7fff,
@@ -106,7 +110,7 @@ impl Cartridge {
                     _ => panic!("Unsupported no. of prg banks!"),
                 }
             }
-            _ => addr,
+            _ => panic!("Cartridge couldn't handle it!"),
         }
     }
 

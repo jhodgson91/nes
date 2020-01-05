@@ -1,10 +1,12 @@
 mod bus;
 mod cartridge;
 mod cpu;
+mod ppu;
 
 use bus::Bus;
 use cartridge::Cartridge;
 use cpu::CPU;
+use ppu::PPU;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -14,11 +16,15 @@ use std::fs::File;
 use std::path::Path;
 
 use ggez::event::{self, EventHandler, KeyCode};
-use ggez::graphics::{self, DrawParam, Drawable, Text, TextFragment};
+use ggez::graphics::{self, DrawParam, Drawable, MeshBuilder, Text, TextFragment};
 use ggez::input::keyboard::KeyMods;
 use ggez::{Context, ContextBuilder, GameResult};
 
 const CPU_HZ: u32 = 1789773; // cycles per second
+
+const SCREEN_W: f32 = 1400.0;
+const SCREEN_H: f32 = 1000.0;
+const MARGIN: f32 = 400.0;
 
 #[derive(Eq, PartialEq)]
 enum RunState {
@@ -29,14 +35,29 @@ enum RunState {
 
 struct NES {
     cpu: CPU,
-    bus: Rc<RefCell<Bus>>,
+    ppu: PPU,
+    _bus: Rc<RefCell<Bus>>,
 
     run_state: RunState,
     disassembly: Vec<(u16, String)>,
 }
 
 impl NES {
-    fn draw_bus(
+    fn new<P: AsRef<Path>>(rom_path: P) -> std::io::Result<Self> {
+        let cartridge = Cartridge::from_nes(File::open(rom_path)?)?;
+        let bus = Rc::new(RefCell::new(Bus::new(cartridge)));
+        let cpu = CPU::new(bus.clone());
+
+        Ok(NES {
+            disassembly: cpu.disassemble(0x0000, 0xffff),
+            ppu: PPU::new(bus.clone()),
+            cpu: cpu,
+            run_state: RunState::Break,
+            _bus: bus,
+        })
+    }
+
+    fn _draw_bus(
         &self,
         ctx: &mut Context,
         mut addr: u16,
@@ -46,7 +67,7 @@ impl NES {
     ) -> GameResult<()> {
         let mut s = String::with_capacity(rows * (8 + (cols * 3)));
 
-        let bus = self.bus.borrow();
+        let bus = self._bus.borrow();
 
         for _ in 1..rows + 1 {
             s += &format!("${:04X}:  ", addr);
@@ -139,16 +160,22 @@ impl EventHandler for NES {
     fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
         match self.run_state {
             RunState::Run => {
-                for _i in 0..CPU_HZ / 60 {
+                for _ in 0..CPU_HZ / 60 {
                     self.cpu.clock();
+                    for _ in 0..3 {
+                        self.ppu.clock()
+                    }
                 }
             }
             RunState::Break => (),
             RunState::Step => {
-                while self.cpu.cycles > 0 {
-                    self.cpu.clock()
-                }
                 self.cpu.clock();
+                while self.cpu.cycles > 0 {
+                    self.cpu.clock();
+                    for _ in 0..3 {
+                        self.ppu.clock()
+                    }
+                }
 
                 self.run_state = RunState::Break;
             }
@@ -157,11 +184,21 @@ impl EventHandler for NES {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
-        graphics::clear(ctx, graphics::Color::new(0.1, 0.1, 0.7, 1.0));
-        self.draw_bus(ctx, 0x100, 16, 16, [0.0, 0.0])?;
-        self.draw_bus(ctx, 0x0, 16, 16, [0.0, 300.0])?;
-        self.draw_cpu(ctx, [550.0, 0.0])?;
-        self.draw_code(ctx, [550.0, 150.0])?;
+        graphics::clear(ctx, graphics::BLACK);
+
+        MeshBuilder::new()
+            .rectangle(
+                graphics::DrawMode::fill(),
+                [SCREEN_W - MARGIN, 0.0, MARGIN, SCREEN_H].into(),
+                [0.1, 0.1, 0.7, 1.0].into(),
+            )
+            .build(ctx)?
+            .draw(ctx, DrawParam::new())?;
+
+        self.ppu
+            .draw(ctx, [0.0, 0.0], (SCREEN_W - MARGIN, SCREEN_H))?;
+        self.draw_cpu(ctx, [SCREEN_W - MARGIN + 5.0, 0.0])?;
+        self.draw_code(ctx, [SCREEN_W - MARGIN + 5.0, 150.0])?;
         graphics::present(ctx)?;
         Ok(())
     }
@@ -204,24 +241,18 @@ impl EventHandler for NES {
     }
 }
 
-impl NES {
-    fn new<P: AsRef<Path>>(rom_path: P) -> std::io::Result<Self> {
-        let cartridge = Cartridge::from_nes(File::open(rom_path)?)?;
-        let bus = Rc::new(RefCell::new(Bus::new(cartridge)));
-        let cpu = CPU::new(bus.clone());
-
-        Ok(NES {
-            disassembly: cpu.disassemble(0x0000, 0xffff),
-            run_state: RunState::Break,
-            cpu,
-            bus,
-        })
-    }
-}
+use ggez::conf::WindowMode;
 
 fn main() -> std::io::Result<()> {
-    let mut nes = NES::new("/home/james/Projects/rust/nes/roms/test.nes")?;
-    let (mut ctx, mut event_loop) = ContextBuilder::new("NES", "jhodgson").build().unwrap();
+    let mut nes = NES::new("/home/james/Projects/rust/nes/roms/nestest.nes")?;
+    let (mut ctx, mut event_loop) = ContextBuilder::new("NES", "jhodgson")
+        .window_mode(WindowMode {
+            width: SCREEN_W,
+            height: SCREEN_H,
+            ..Default::default()
+        })
+        .build()
+        .unwrap();
 
     match event::run(&mut ctx, &mut event_loop, &mut nes) {
         Ok(_) => (),

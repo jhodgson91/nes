@@ -1,6 +1,6 @@
 .segment "CHARS"
 .segment "HEADER"
-    .byte "NES",26,2,1 ; 32K PRG, 8K CHR
+    .byte "NES",26,1,0 ; 16K PRG, 0K CHR
 .segment "VECTORS"
     .word nmi, reset, irq
 .segment "STARTUP" ; avoids warning

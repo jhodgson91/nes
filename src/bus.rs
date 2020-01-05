@@ -2,8 +2,8 @@ use super::cartridge::Cartridge;
 use num::PrimInt;
 
 pub struct Bus {
-    ram: [u8; 2 * 1024], // 2KB internal ram
-
+    // CPU data
+    ram: [u8; 2 * 1024],    // 2KB internal ram
     ppu_registers: [u8; 8], // 8-bytes of PPU registers
     io_registers: [u8; 32], // 20 bytes of IO registers
 
@@ -13,6 +13,7 @@ pub struct Bus {
 impl Bus {
     pub fn new(cartridge: Cartridge) -> Self {
         Bus {
+            // CPU
             ram: [0; 2 * 1024],
             ppu_registers: [0; 8],
             io_registers: [0; 32],
@@ -26,7 +27,7 @@ impl Bus {
             0x2000..=0x3fff => Self::read(addr & 0x0007, &self.ppu_registers),
             0x4000..=0x401f => Self::read(addr - 0x4000, &self.io_registers),
             0x6000..=0x7fff => Self::read(addr - 0x6000, &self.cartridge.sram),
-            _ => Self::read(self.cartridge.map(addr), &self.cartridge.prg_rom),
+            _ => Self::read(self.cartridge.cpu_map(addr), &self.cartridge.prg_rom),
         }
     }
 

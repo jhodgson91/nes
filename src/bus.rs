@@ -10,40 +10,6 @@ pub struct Bus {
     cartridge: Cartridge,
 }
 
-trait Mapper {
-    fn map(&self, addr: u16) -> (u16, &[u8]);
-    fn map_mut(&mut self, addr: u16) -> (u16, &mut [u8]);
-}
-
-impl Mapper for Bus {
-    fn map(&self, addr: u16) -> (u16, &[u8]) {
-        match addr {
-            0x000..=0x1fff => (addr & 0x07ff, &self.ram),
-            0x2000..=0x3fff => (addr & 0x0007, &self.ppu_registers),
-            0x4000..=0x401f => (addr - 0x4000, &self.io_registers),
-            0x6000..=0x7fff => (addr - 0x6000, &self.cartridge.sram),
-            _ => match self.cartridge.prg_size() {
-                2 => (addr & 0x7fff, &self.cartridge.prg_rom),
-                1 => (addr & 0x3fff, &self.cartridge.prg_rom),
-                _ => panic!("Unsupported number of prg banks!"),
-            },
-        }
-    }
-
-    fn map_mut(&mut self, addr: u16) -> (u16, &mut [u8]) {
-        match addr {
-            0x000..=0x1fff => (addr & 0x07ff, &mut self.ram),
-            0x2000..=0x3fff => (addr & 0x0007, &mut self.ppu_registers),
-            0x4000..=0x401f => (addr - 0x4000, &mut self.io_registers),
-            0x6000..=0x7fff => (addr - 0x6000, &mut self.cartridge.sram),
-            _ => panic!(
-                "Attempted to get write-access to cartridge at address ${:0X}",
-                addr
-            ),
-        }
-    }
-}
-
 impl Bus {
     pub fn new(cartridge: Cartridge) -> Self {
         Bus {
@@ -55,13 +21,26 @@ impl Bus {
     }
 
     pub fn cpu_read<U: PrimInt>(&self, addr: u16) -> U {
-        let (addr, mem) = self.map(addr);
-        Self::read(addr, mem)
+        match addr {
+            0x000..=0x1fff => Self::read(addr & 0x07ff, &self.ram),
+            0x2000..=0x3fff => Self::read(addr & 0x0007, &self.ppu_registers),
+            0x4000..=0x401f => Self::read(addr - 0x4000, &self.io_registers),
+            0x6000..=0x7fff => Self::read(addr - 0x6000, &self.cartridge.sram),
+            _ => Self::read(self.cartridge.map(addr), &self.cartridge.prg_rom),
+        }
     }
 
     pub fn cpu_write<U: PrimInt>(&mut self, addr: u16, data: U) {
-        let (addr, mem) = self.map_mut(addr);
-        Self::write(addr, mem, data)
+        match addr {
+            0x000..=0x1fff => Self::write(addr & 0x07ff, &mut self.ram, data),
+            0x2000..=0x3fff => Self::write(addr & 0x0007, &mut self.ppu_registers, data),
+            0x4000..=0x401f => Self::write(addr - 0x4000, &mut self.io_registers, data),
+            0x6000..=0x7fff => Self::write(addr - 0x6000, &mut self.cartridge.sram, data),
+            _ => panic!(
+                "Attempted to get write-access to cartridge at address ${:0X}",
+                addr
+            ),
+        }
     }
 
     fn read<U: PrimInt>(addr: u16, from: &[u8]) -> U {

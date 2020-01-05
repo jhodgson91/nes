@@ -1,7 +1,5 @@
 use super::AddressMode;
-use super::CPU;
-
-use bit_field::BitField;
+use super::{Flags, CPU};
 
 impl CPU {
     pub fn disassemble(&self, mut pc: u32, to: u16) -> Vec<(u16, String)> {
@@ -53,7 +51,7 @@ impl CPU {
                 }
                 AddressMode::REL => {
                     let oper = bus.cpu_read::<u8>(pc as u16) as u16;
-                    let dest = (pc as u16).wrapping_add(if oper.get_bit(7) {
+                    let dest = (pc as u16).wrapping_add(if oper & 1 << 7 != 0 {
                         oper | 0xff00
                     } else {
                         oper
@@ -100,9 +98,9 @@ impl CPU {
     }
 
     pub(super) fn compare(&mut self, lhs: u8, rhs: u8) {
-        self.set_flag(Self::C, lhs >= rhs);
-        self.set_flag(Self::Z, lhs == rhs);
-        self.set_flag(Self::N, (lhs.wrapping_sub(rhs)).get_bit(7));
+        self.set_flag(Flags::C, lhs >= rhs);
+        self.set_flag(Flags::Z, lhs == rhs);
+        self.set_flag(Flags::N, (lhs.wrapping_sub(rhs)) & 1 << 7 != 0);
     }
 
     pub(super) fn push_state(&mut self) {
@@ -111,13 +109,15 @@ impl CPU {
         self.bus.borrow_mut().cpu_write(self.stack_addr(), self.pc);
         self.sp = self.sp.wrapping_sub(1);
 
-        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.st);
+        self.bus
+            .borrow_mut()
+            .cpu_write(self.stack_addr(), self.st.bits());
         self.sp = self.sp.wrapping_sub(1);
     }
 
     pub(super) fn pop_state(&mut self) {
         self.sp = self.sp.wrapping_add(1);
-        self.st = self.bus.borrow_mut().cpu_read(self.stack_addr());
+        self.st = Flags::from_bits(self.bus.borrow_mut().cpu_read(self.stack_addr())).unwrap();
 
         self.sp = self.sp.wrapping_add(1);
         self.pc = self.bus.borrow().cpu_read(self.stack_addr());

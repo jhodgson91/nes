@@ -49,6 +49,14 @@ impl Cartridge {
         })
     }
 
+    pub fn map(&self, addr: u16) -> u16 {
+        match self.prg_size() {
+            2 => addr & 0x7fff,
+            1 => addr & 0x3fff,
+            _ => panic!("Unsupported number of prg banks!"),
+        }
+    }
+
     pub fn prg_size(&self) -> usize {
         // 16Kb chunks
         self.prg_rom.len() / 16_384

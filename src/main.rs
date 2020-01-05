@@ -40,41 +40,25 @@ impl NES {
         &self,
         ctx: &mut Context,
         mut addr: u16,
-        rows: u8,
-        cols: u8,
+        rows: usize,
+        cols: usize,
         pos: [f32; 2],
     ) -> GameResult<()> {
-        const LINE: f32 = 20.0;
-        const SPACE: f32 = 25.0;
+        let mut s = String::with_capacity(rows * (8 + (cols * 3)));
 
         let bus = self.bus.borrow();
 
-        for i in 0..cols {
-            Text::new(format!("{:02X}", i)).draw(
-                ctx,
-                DrawParam::new().dest([pos[0] + 60.0 + (SPACE * i as f32), pos[1]]),
-            )?;
-        }
+        for _ in 1..rows + 1 {
+            s += &format!("${:04X}:  ", addr);
 
-        for r in 1..rows + 1 {
-            Text::new(format!("${:04X}:", addr)).draw(
-                ctx,
-                DrawParam::default().dest([pos[0], pos[1] + (LINE * r as f32)]),
-            )?;
-
-            for c in 0..cols {
-                Text::new(format!("{:02X} ", bus.cpu_read::<u8>(addr))).draw(
-                    ctx,
-                    DrawParam::new().dest([
-                        pos[0] + 60.0 + (SPACE * c as f32),
-                        pos[1] + (LINE * r as f32),
-                    ]),
-                )?;
+            for _ in 0..cols {
+                s += &format!("{:02X} ", bus.cpu_read::<u8>(addr));
                 addr += 1;
             }
+            s += "\n";
         }
 
-        Ok(())
+        Text::new(s).draw(ctx, DrawParam::new().dest([pos[0], pos[1]]))
     }
 
     fn draw_code(&self, ctx: &mut Context, pos: [f32; 2]) -> GameResult<()> {
@@ -87,20 +71,16 @@ impl NES {
                 self.cpu.pc
             )))?;
 
-        for (i, entry) in self.disassembly[idx.saturating_sub(10)..idx.saturating_add(10)]
-            .iter()
-            .enumerate()
-        {
+        let mut txt = Text::default();
+        for entry in &self.disassembly[idx.saturating_sub(10)..idx.saturating_add(10)] {
             let mut t = TextFragment::new(entry.1.clone());
             if entry.0 == self.cpu.pc {
                 t = t.color([0.0, 1.0, 0.0, 1.0].into());
             }
-
-            Text::new(t).draw(
-                ctx,
-                DrawParam::new().dest([pos[0], pos[1] + i as f32 * 20.0]),
-            )?;
+            txt.add(t);
+            txt.add("\n");
         }
+        txt.draw(ctx, DrawParam::new().dest([pos[0], pos[1]]))?;
 
         Ok(())
     }
@@ -109,16 +89,6 @@ impl NES {
         const LINE_HEIGHT: f32 = 20.0;
         let col1 = pos[0];
         let col2 = pos[0] + 80.0;
-
-        macro_rules! flag_text {
-            ($f: ident) => {
-                TextFragment::new(stringify!($f)).color(if self.cpu.get_flag(CPU::$f) {
-                    [0.0, 1.0, 0.0, 1.0].into()
-                } else {
-                    [1.0, 0.0, 0.0, 1.0].into()
-                });
-            };
-        }
 
         macro_rules! draw_two_col {
             ($first: expr, $second: expr, $line: literal) => {
@@ -133,19 +103,7 @@ impl NES {
             };
         }
 
-        let flags = {
-            let mut res = Text::default();
-            res.add(flag_text!(N));
-            res.add(flag_text!(U));
-            res.add(flag_text!(V));
-            res.add(flag_text!(B));
-            res.add(flag_text!(D));
-            res.add(flag_text!(I));
-            res.add(flag_text!(Z));
-            res.add(flag_text!(C));
-            res
-        };
-
+        let flags: Text = self.cpu.st.into();
         draw_two_col!("Status:", flags, 0);
         draw_two_col!("PC:", Text::new(format!("${:04X}", self.cpu.pc)), 1);
         draw_two_col!(
@@ -200,8 +158,8 @@ impl EventHandler for NES {
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         graphics::clear(ctx, graphics::Color::new(0.1, 0.1, 0.7, 1.0));
-        self.draw_bus(ctx, 0x1f0, 1, 16, [0.0, 0.0])?;
-        self.draw_bus(ctx, 0x0, 2, 16, [0.0, 100.0])?;
+        self.draw_bus(ctx, 0x100, 16, 16, [0.0, 0.0])?;
+        self.draw_bus(ctx, 0x0, 16, 16, [0.0, 300.0])?;
         self.draw_cpu(ctx, [550.0, 0.0])?;
         self.draw_code(ctx, [550.0, 150.0])?;
         graphics::present(ctx)?;

@@ -12,17 +12,52 @@ use super::bus::Bus;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bit_field::BitField;
-
 type Interrupt = (u16, u8);
 
+bitflags::bitflags! {
+    pub struct Flags: u8 {
+        const C = 1<<0;
+        const Z = 1<<1;
+        const I = 1<<2;
+        const D = 1<<3;
+        const B = 1<<4;
+        const U = 1<<5;
+        const V = 1<<6;
+        const N = 1<<7;
+
+        const STARTUP = Self::U.bits | Self::B.bits | Self::I.bits;
+    }
+}
+
+use ggez::graphics::{Text, TextFragment};
+impl Into<Text> for Flags {
+    fn into(self) -> Text {
+        macro_rules! generate_text {
+            ($($f: ident),*) => {{
+                let mut t = Text::default();
+                $(
+                    t.add(TextFragment::new(stringify!($f)).color(if self.contains(Flags::$f) {
+                        [0.0, 1.0, 0.0, 1.0].into()
+                    } else {
+                        [1.0, 0.0, 0.0, 1.0].into()
+                    }));
+                )*
+
+                t
+            }};
+        }
+
+        generate_text!(N, V, U, B, D, I, Z, C)
+    }
+}
+
 pub struct CPU {
-    pub pc: u16, // program counter
-    pub sp: u8,  // stack ptr
-    pub x: u8,   // idx reg x
-    pub y: u8,   // idx reg y
-    pub a: u8,   // accumulator
-    pub st: u8,  // status
+    pub pc: u16,   // program counter
+    pub sp: u8,    // stack ptr
+    pub x: u8,     // idx reg x
+    pub y: u8,     // idx reg y
+    pub a: u8,     // accumulator
+    pub st: Flags, // status
 
     pub oper: u16, // Operand for the current instruction
 
@@ -39,16 +74,6 @@ impl CPU {
     const RES: Interrupt = (0xfffc, 8);
     const IRQ: Interrupt = (0xfffe, 7);
 
-    // Flags
-    pub const C: usize = 0; // Carry
-    pub const Z: usize = 1; // Zero
-    pub const I: usize = 2; // Interrupt
-    pub const D: usize = 3; // Decimal
-    pub const B: usize = 4; // Break
-    pub const U: usize = 5; // Unused
-    pub const V: usize = 6; // Overflow
-    pub const N: usize = 7; // Negative
-
     pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
         let pc = bus.borrow().cpu_read::<u16>(0xfffc);
         CPU {
@@ -57,7 +82,7 @@ impl CPU {
             y: 0,
             a: 0,
             sp: 0xfd,
-            st: 0x34,
+            st: Flags::STARTUP,
 
             cycles: 0,
 
@@ -80,7 +105,7 @@ impl CPU {
     }
 
     pub fn irq(&mut self) {
-        if !self.get_flag(Self::I) {
+        if !self.get_flag(Flags::I) {
             self.interrupt = Some(Self::IRQ);
         }
     }
@@ -96,7 +121,7 @@ impl CPU {
                     self.x = 0;
                     self.y = 0;
                     self.sp = 0xfd;
-                    self.st = 0x34;
+                    self.st = Flags::STARTUP;
 
                     self.oper = 0;
                     self.instruction = &Instruction::INVALID;
@@ -105,12 +130,12 @@ impl CPU {
                 }
                 // IRQ and NMI behave the same
                 Some(interrupt) => {
-                    self.set_flag(Self::U, true);
-                    self.set_flag(Self::B, false);
+                    self.set_flag(Flags::U, true);
+                    self.set_flag(Flags::B, false);
 
                     self.push_state();
 
-                    self.set_flag(Self::I, true);
+                    self.set_flag(Flags::I, true);
 
                     self.pc = self.bus.borrow().cpu_read::<u16>(interrupt.0);
                     self.cycles = interrupt.1;
@@ -142,12 +167,12 @@ impl CPU {
         0x100u16 + self.sp as u16
     }
 
-    pub fn get_flag(&self, f: usize) -> bool {
-        self.st.get_bit(f)
+    pub fn get_flag(&self, f: Flags) -> bool {
+        self.st.contains(f)
     }
 
-    fn set_flag(&mut self, f: usize, val: bool) {
-        self.st.set_bit(f, val);
+    fn set_flag(&mut self, f: Flags, val: bool) {
+        self.st.set(f, val);
     }
 
     /// Reads the operand according to address mode

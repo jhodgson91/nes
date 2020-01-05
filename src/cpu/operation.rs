@@ -1,6 +1,4 @@
-use super::CPU;
-
-use bit_field::BitField;
+use super::{Flags, CPU};
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum Operation {
@@ -133,14 +131,14 @@ impl CPU {
         let oper = self.read_oper();
 
         let a1 = self.a.overflowing_add(oper);
-        let a2 = a1.0.overflowing_add(self.get_flag(Self::C) as u8);
+        let a2 = a1.0.overflowing_add(self.get_flag(Flags::C) as u8);
 
-        let v = (self.a ^ oper & !(self.a ^ a2.0) & 0x80) != 0;
+        let v = (self.a ^ oper & !(self.a ^ a2.0) & 1 << 7) != 0;
 
-        self.set_flag(Self::V, v);
-        self.set_flag(Self::C, a1.1 | a2.1);
-        self.set_flag(Self::Z, a2.0 == 0);
-        self.set_flag(Self::N, a2.0.get_bit(7));
+        self.set_flag(Flags::V, v);
+        self.set_flag(Flags::C, a1.1 | a2.1);
+        self.set_flag(Flags::Z, a2.0 == 0);
+        self.set_flag(Flags::N, a2.0 & 1 << 7 != 0);
 
         self.a = a2.0;
     }
@@ -150,99 +148,99 @@ impl CPU {
         let oper = !self.read_oper();
 
         let a1 = self.a.overflowing_add(oper);
-        let a2 = a1.0.overflowing_add(self.get_flag(Self::C) as u8);
+        let a2 = a1.0.overflowing_add(self.get_flag(Flags::C) as u8);
 
-        let v = (self.a ^ oper & !(self.a ^ a2.0) & 0x80) != 0;
+        let v = (self.a ^ oper & !(self.a ^ a2.0) & 1 << 7) != 0;
 
-        self.set_flag(Self::V, v);
-        self.set_flag(Self::C, a1.1 | a2.1);
-        self.set_flag(Self::Z, a2.0 == 0);
-        self.set_flag(Self::N, a2.0.get_bit(7));
+        self.set_flag(Flags::V, v);
+        self.set_flag(Flags::C, a1.1 | a2.1);
+        self.set_flag(Flags::Z, a2.0 == 0);
+        self.set_flag(Flags::N, a2.0 & 1 << 7 != 0);
 
         self.a = a2.0;
     }
     //	and (with accumulator)
     fn and(&mut self) {
         self.a &= self.read_oper();
-        self.set_flag(Self::Z, self.a == 0);
-        self.set_flag(Self::N, self.a.get_bit(7));
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, self.a & 1 << 7 != 0);
     }
     //	arithmetic shift left
     fn asl(&mut self) {
         let mut v = self.read_oper();
-        self.set_flag(Self::C, v.get_bit(7));
+        self.set_flag(Flags::C, v & 1 << 7 != 0);
         v <<= 1;
-        self.set_flag(Self::Z, v != 0);
-        self.set_flag(Self::N, v.get_bit(7));
+        self.set_flag(Flags::Z, v != 0);
+        self.set_flag(Flags::N, v & 1 << 7 != 0);
 
         self.write_oper(v);
     }
     //	branch on carry clear
     fn bcc(&mut self) {
-        self.branch_on_condition(!self.get_flag(Self::C), self.oper);
+        self.branch_on_condition(!self.get_flag(Flags::C), self.oper);
     }
     //	branch on carry set
     fn bcs(&mut self) {
-        self.branch_on_condition(self.get_flag(Self::C), self.oper);
+        self.branch_on_condition(self.get_flag(Flags::C), self.oper);
     }
     //	branch on equal (zero set)
     fn beq(&mut self) {
-        self.branch_on_condition(self.get_flag(Self::Z), self.oper);
+        self.branch_on_condition(self.get_flag(Flags::Z), self.oper);
     }
     //	branch on not equal (zero clear)
     fn bne(&mut self) {
-        self.branch_on_condition(!self.get_flag(Self::Z), self.oper);
+        self.branch_on_condition(!self.get_flag(Flags::Z), self.oper);
     }
     //	bit test
     fn bit(&mut self) {
         let v = self.read_oper();
-        self.set_flag(Self::V, v.get_bit(6));
-        self.set_flag(Self::N, v.get_bit(7));
-        self.set_flag(Self::Z, self.a & v == 0);
+        self.set_flag(Flags::V, v & 1 << 6 != 0);
+        self.set_flag(Flags::N, v & 1 << 7 != 0);
+        self.set_flag(Flags::Z, self.a & v == 0);
     }
     //	branch on minus (negative set)
     fn bmi(&mut self) {
-        self.branch_on_condition(self.get_flag(Self::N), self.oper);
+        self.branch_on_condition(self.get_flag(Flags::N), self.oper);
     }
     //	branch on plus (negative clear)
     fn bpl(&mut self) {
-        self.branch_on_condition(!self.get_flag(Self::N), self.oper);
+        self.branch_on_condition(!self.get_flag(Flags::N), self.oper);
     }
     //  break / interrupt
     fn brk(&mut self) {
         // Set break flag
-        self.set_flag(Self::U, true);
-        self.set_flag(Self::B, true);
+        self.set_flag(Flags::U, true);
+        self.set_flag(Flags::B, true);
 
         self.push_state();
 
-        self.set_flag(Self::I, true);
+        self.set_flag(Flags::I, true);
 
         self.pc = self.bus.borrow_mut().cpu_read(0xfffe);
     }
     //	branch on overflow clear
     fn bvc(&mut self) {
-        self.branch_on_condition(!self.get_flag(Self::V), self.oper);
+        self.branch_on_condition(!self.get_flag(Flags::V), self.oper);
     }
     //	branch on overflow set
     fn bvs(&mut self) {
-        self.branch_on_condition(self.get_flag(Self::V), self.oper);
+        self.branch_on_condition(self.get_flag(Flags::V), self.oper);
     }
     //	clear carry
     fn clc(&mut self) {
-        self.set_flag(Self::C, false);
+        self.set_flag(Flags::C, false);
     }
     //	clear decimal
     fn cld(&mut self) {
-        self.set_flag(Self::D, false);
+        self.set_flag(Flags::D, false);
     }
     //	clear interrupt disable
     fn cli(&mut self) {
-        self.set_flag(Self::I, false);
+        self.set_flag(Flags::I, false);
     }
     //	clear overflow
     fn clv(&mut self) {
-        self.set_flag(Self::V, false);
+        self.set_flag(Flags::V, false);
     }
     //	compare (with accumulator)
     fn cmp(&mut self) {
@@ -259,46 +257,46 @@ impl CPU {
     //	decrement
     fn dec(&mut self) {
         let m = self.read_oper().wrapping_sub(1);
-        self.set_flag(Self::Z, m == 0);
-        self.set_flag(Self::N, m.get_bit(7));
+        self.set_flag(Flags::Z, m == 0);
+        self.set_flag(Flags::N, m & 1 << 7 != 0);
         self.write_oper(m);
     }
     //	decrement X
     fn dex(&mut self) {
         self.x = self.x.wrapping_sub(1);
-        self.set_flag(Self::Z, self.x == 0);
-        self.set_flag(Self::N, self.x.get_bit(7));
+        self.set_flag(Flags::Z, self.x == 0);
+        self.set_flag(Flags::N, self.x & 1 << 7 != 0);
     }
     //	decrement Y
     fn dey(&mut self) {
         self.y = self.y.wrapping_sub(1);
-        self.set_flag(Self::Z, self.y == 0);
-        self.set_flag(Self::N, self.y.get_bit(7));
+        self.set_flag(Flags::Z, self.y == 0);
+        self.set_flag(Flags::N, self.y & 1 << 7 != 0);
     }
     //	exclusive or (with accumulator)
     fn eor(&mut self) {
         self.a ^= self.read_oper();
-        self.set_flag(Self::Z, self.a == 0);
-        self.set_flag(Self::N, self.a.get_bit(7));
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, self.a & 1 << 7 != 0);
     }
     //	increment
     fn inc(&mut self) {
         let m = self.bus.borrow().cpu_read::<u8>(self.oper).wrapping_add(1);
-        self.set_flag(Self::Z, m == 0);
-        self.set_flag(Self::N, m.get_bit(7));
+        self.set_flag(Flags::Z, m == 0);
+        self.set_flag(Flags::N, m & 1 << 7 != 0);
         self.write_oper(m);
     }
     //	increment X
     fn inx(&mut self) {
         self.x = self.x.wrapping_add(1);
-        self.set_flag(Self::Z, self.x == 0);
-        self.set_flag(Self::N, self.x.get_bit(7));
+        self.set_flag(Flags::Z, self.x == 0);
+        self.set_flag(Flags::N, self.x & 1 << 7 != 0);
     }
     //	increment Y
     fn iny(&mut self) {
         self.y = self.y.wrapping_add(1);
-        self.set_flag(Self::Z, self.y == 0);
-        self.set_flag(Self::N, self.y.get_bit(7));
+        self.set_flag(Flags::Z, self.y == 0);
+        self.set_flag(Flags::N, self.y & 1 << 7 != 0);
     }
     //	jump
     fn jmp(&mut self) {
@@ -321,29 +319,29 @@ impl CPU {
     //	load accumulator
     fn lda(&mut self) {
         self.a = self.read_oper();
-        self.set_flag(Self::Z, self.a == 0);
-        self.set_flag(Self::N, self.a.get_bit(7));
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, self.a & 1 << 7 != 0);
     }
     //	load X
     fn ldx(&mut self) {
         self.x = self.read_oper();
-        self.set_flag(Self::Z, self.x == 0);
-        self.set_flag(Self::N, self.x.get_bit(7));
+        self.set_flag(Flags::Z, self.x == 0);
+        self.set_flag(Flags::N, self.x & 1 << 7 != 0);
     }
     //	load Y
     fn ldy(&mut self) {
         self.y = self.read_oper();
-        self.set_flag(Self::Z, self.y == 0);
-        self.set_flag(Self::N, self.y.get_bit(7));
+        self.set_flag(Flags::Z, self.y == 0);
+        self.set_flag(Flags::N, self.y & 1 << 7 != 0);
     }
     //	logical shift right
     fn lsr(&mut self) {
         let mut v = self.read_oper();
 
-        self.set_flag(Self::C, v.get_bit(0));
+        self.set_flag(Flags::C, v & 1 << 0 != 0);
         v >>= 1;
-        self.set_flag(Self::Z, v != 0);
-        self.set_flag(Self::N, v.get_bit(7));
+        self.set_flag(Flags::Z, v != 0);
+        self.set_flag(Flags::N, v & 1 << 7 != 0);
 
         self.write_oper(v);
     }
@@ -352,8 +350,8 @@ impl CPU {
     //	or with accumulator
     fn ora(&mut self) {
         self.a |= self.read_oper();
-        self.set_flag(Self::Z, self.a == 0);
-        self.set_flag(Self::N, self.a.get_bit(7));
+        self.set_flag(Flags::Z, self.a == 0);
+        self.set_flag(Flags::N, self.a & 1 << 7 != 0);
     }
     //	push accumulator
     fn pha(&mut self) {
@@ -364,28 +362,30 @@ impl CPU {
     fn pla(&mut self) {
         self.sp = self.sp.wrapping_add(1);
         self.a = self.bus.borrow().cpu_read(self.stack_addr());
-        self.set_flag(Self::Z, self.a != 0);
-        self.set_flag(Self::N, self.a.get_bit(7));
+        self.set_flag(Flags::Z, self.a != 0);
+        self.set_flag(Flags::N, self.a & 1 << 7 != 0);
     }
     //	push processor status (SR)
     fn php(&mut self) {
-        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.st);
+        self.bus
+            .borrow_mut()
+            .cpu_write(self.stack_addr(), self.st.bits());
         self.sp = self.sp.wrapping_sub(1);
     }
     //	pull processor status (SR)
     fn plp(&mut self) {
         self.sp = self.sp.wrapping_add(1);
-        self.st = self.bus.borrow().cpu_read(self.stack_addr());
+        self.st = Flags::from_bits(self.bus.borrow().cpu_read(self.stack_addr())).unwrap();
     }
     //	rotate left
     fn rol(&mut self) {
         let old = self.read_oper();
         let mut new = old << 1;
-        new |= self.st & 0x1;
+        new |= self.st.bits() & 0x1;
 
-        self.set_flag(Self::C, old.get_bit(0));
-        self.set_flag(Self::Z, new == 0);
-        self.set_flag(Self::N, new.get_bit(7));
+        self.set_flag(Flags::C, old & 0x1 != 0);
+        self.set_flag(Flags::Z, new == 0);
+        self.set_flag(Flags::N, new & 1 << 7 != 0);
 
         self.write_oper(new);
     }
@@ -393,11 +393,11 @@ impl CPU {
     fn ror(&mut self) {
         let old = self.read_oper();
         let mut new = old >> 1;
-        new |= self.st & 0x80;
+        new |= self.st.bits() & 1 << 7;
 
-        self.set_flag(Self::C, old.get_bit(0));
-        self.set_flag(Self::Z, new == 0);
-        self.set_flag(Self::N, new.get_bit(7));
+        self.set_flag(Flags::C, old & 0x1 != 0);
+        self.set_flag(Flags::Z, new == 0);
+        self.set_flag(Flags::N, new & 1 << 7 != 0);
 
         self.write_oper(new);
     }
@@ -405,19 +405,19 @@ impl CPU {
     fn rti(&mut self) {
         self.pop_state();
 
-        self.set_flag(Self::B, false);
+        self.set_flag(Flags::B, false);
     }
     //	set carry
     fn sec(&mut self) {
-        self.set_flag(Self::C, true);
+        self.set_flag(Flags::C, true);
     }
     //	set decimal
     fn sed(&mut self) {
-        self.set_flag(Self::D, true);
+        self.set_flag(Flags::D, true);
     }
     //	set interrupt disable
     fn sei(&mut self) {
-        self.set_flag(Self::I, true);
+        self.set_flag(Flags::I, true);
     }
     //	store accumulator
     fn sta(&mut self) {

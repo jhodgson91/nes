@@ -1,4 +1,5 @@
 use super::cartridge::Cartridge;
+use super::ppu::*;
 use num::PrimInt;
 
 pub struct Bus {
@@ -22,7 +23,6 @@ impl Bus {
             io_registers: [0; 32],
 
             palettes: [0; 32],
-
             nametables: [[0; 1024]; 2],
 
             cartridge,

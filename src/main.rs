@@ -197,6 +197,10 @@ impl EventHandler for NES {
 
         self.ppu
             .draw(ctx, [0.0, 0.0], (SCREEN_W - MARGIN, SCREEN_H))?;
+        self.ppu
+            .draw_pattern_table(ctx, [SCREEN_W - MARGIN + 5.0, 500.0], 0, 1)?;
+        self.ppu
+            .draw_pattern_table(ctx, [SCREEN_W - MARGIN + 150.0, 500.0], 1, 1)?;
         self.draw_cpu(ctx, [SCREEN_W - MARGIN + 5.0, 0.0])?;
         self.draw_code(ctx, [SCREEN_W - MARGIN + 5.0, 150.0])?;
         graphics::present(ctx)?;

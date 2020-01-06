@@ -26,8 +26,8 @@ pub struct PPU {
 }
 
 impl PPU {
-    const COLORS: [Rgba<u8>; 0x1f] = {
-        let mut res = [Rgba([0, 0, 0, 0]); 0x1f];
+    const COLORS: [Rgba<u8>; 0x40] = {
+        let mut res = [Rgba([0, 0, 0, 0]); 0x40];
 
         macro_rules! add_col {
             ($idx: literal, $r: literal, $g: literal, $b: literal) => {
@@ -144,8 +144,32 @@ impl PPU {
         ctx: &mut Context,
         pos: [f32; 2],
         table: u8,
-        palette: u8,
+        palette: u16,
     ) -> GameResult<()> {
-        Ok(())
+        let mut img = image::RgbaImage::new(128, 128);
+
+        // A pattern table contains 16x16 tiles
+        for tile_y in 0..16 {
+            for tile_x in 0..16 {
+                // Jump by 256 bytes per tile row, and 16 bytes per tile
+                // This is the byte offset into pattern memory
+                let offset = tile_y * 256 + tile_x * 16;
+
+                // Each tile contains 8x8 pixels, split into two "bit planes"
+                // The first plan contains the lsb, the second the msb of the pixel
+                for row in 0..8 {
+                    let addr: u16 = table as u16 * 0x1000 + offset + row;
+                    let lsb = self.bus.borrow().ppu_read::<u8>(addr + 0x0000) as u16;
+                    let msb = self.bus.borrow().ppu_read::<u8>(addr + 0x0008) as u16;
+                    for col in 0..8 {
+                        let pixel = (lsb >> col) & 0x1 + (msb >> col) & 0x1;
+                        *img.get_pixel_mut((tile_x * 8 + row) as u32, (tile_y * 8 + col) as u32) =
+                            self.get_color(palette, pixel as u16);
+                    }
+                }
+            }
+        }
+
+        Image::from_rgba8(ctx, 128, 128, &*img)?.draw(ctx, DrawParam::new().dest(pos))
     }
 }

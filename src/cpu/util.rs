@@ -1,9 +1,8 @@
 use super::AddressMode;
-use super::{Flags, CPU};
+use super::{Bus, Flags, CPU};
 
 impl CPU {
-    pub fn disassemble(&self, mut pc: u32, to: u16) -> Vec<(u16, String)> {
-        let bus = self.bus.borrow();
+    pub fn disassemble(&self, mut pc: u32, to: u16, bus: &Bus) -> Vec<(u16, String)> {
         let mut res = Vec::new();
 
         while pc < to as u32 {
@@ -103,24 +102,22 @@ impl CPU {
         self.set_flag(Flags::N, (lhs.wrapping_sub(rhs)) & 1 << 7 != 0);
     }
 
-    pub(super) fn push_state(&mut self) {
+    pub(super) fn push_state(&mut self, bus: &mut Bus) {
         // PC should be written to the sp and one before, so dec first, then write u16, then dec
         self.sp = self.sp.wrapping_sub(1);
-        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.pc);
+        bus.cpu_write(self.stack_addr(), self.pc);
         self.sp = self.sp.wrapping_sub(1);
 
-        self.bus
-            .borrow_mut()
-            .cpu_write(self.stack_addr(), self.st.bits());
+        bus.cpu_write(self.stack_addr(), self.st.bits());
         self.sp = self.sp.wrapping_sub(1);
     }
 
-    pub(super) fn pop_state(&mut self) {
+    pub(super) fn pop_state(&mut self, bus: &Bus) {
         self.sp = self.sp.wrapping_add(1);
-        self.st = Flags::from_bits(self.bus.borrow_mut().cpu_read(self.stack_addr())).unwrap();
+        self.st = Flags::from_bits(bus.cpu_read(self.stack_addr())).unwrap();
 
         self.sp = self.sp.wrapping_add(1);
-        self.pc = self.bus.borrow().cpu_read(self.stack_addr());
+        self.pc = bus.cpu_read(self.stack_addr());
         self.sp = self.sp.wrapping_add(1);
     }
 }

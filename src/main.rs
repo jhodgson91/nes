@@ -3,13 +3,10 @@ mod cartridge;
 mod cpu;
 mod ppu;
 
-use bus::Bus;
-use cartridge::Cartridge;
-use cpu::CPU;
-use ppu::PPU;
-
-use std::cell::RefCell;
-use std::rc::Rc;
+pub use bus::Bus;
+pub use cartridge::Cartridge;
+pub use cpu::CPU;
+pub use ppu::PPU;
 
 use std::convert::AsRef;
 use std::fs::File;
@@ -34,9 +31,9 @@ enum RunState {
 }
 
 struct NES {
+    bus: Bus,
     cpu: CPU,
     ppu: PPU,
-    _bus: Rc<RefCell<Bus>>,
 
     run_state: RunState,
     disassembly: Vec<(u16, String)>,
@@ -45,15 +42,15 @@ struct NES {
 impl NES {
     fn new<P: AsRef<Path>>(rom_path: P) -> std::io::Result<Self> {
         let cartridge = Cartridge::from_nes(File::open(rom_path)?)?;
-        let bus = Rc::new(RefCell::new(Bus::new(cartridge)));
-        let cpu = CPU::new(bus.clone());
+        let bus = Bus::new(cartridge);
+        let cpu = CPU::new(bus.cpu_read::<u16>(0xfffc));
 
         Ok(NES {
-            disassembly: cpu.disassemble(0x0000, 0xffff),
-            ppu: PPU::new(bus.clone()),
+            disassembly: cpu.disassemble(0x0000, 0xffff, &bus),
+            ppu: PPU::new(),
             cpu: cpu,
+            bus: bus,
             run_state: RunState::Break,
-            _bus: bus,
         })
     }
 
@@ -67,13 +64,11 @@ impl NES {
     ) -> GameResult<()> {
         let mut s = String::with_capacity(rows * (8 + (cols * 3)));
 
-        let bus = self._bus.borrow();
-
         for _ in 1..rows + 1 {
             s += &format!("${:04X}:  ", addr);
 
             for _ in 0..cols {
-                s += &format!("{:02X} ", bus.cpu_read::<u8>(addr));
+                s += &format!("{:02X} ", self.bus.cpu_read::<u8>(addr));
                 addr += 1;
             }
             s += "\n";
@@ -161,19 +156,19 @@ impl EventHandler for NES {
         match self.run_state {
             RunState::Run => {
                 for _ in 0..CPU_HZ / 60 {
-                    self.cpu.clock();
+                    self.cpu.clock(&mut self.bus);
                     for _ in 0..3 {
-                        self.ppu.clock()
+                        self.ppu.clock(&mut self.bus)
                     }
                 }
             }
             RunState::Break => (),
             RunState::Step => {
-                self.cpu.clock();
+                self.cpu.clock(&mut self.bus);
                 while self.cpu.cycles > 0 {
-                    self.cpu.clock();
+                    self.cpu.clock(&mut self.bus);
                     for _ in 0..3 {
-                        self.ppu.clock()
+                        self.ppu.clock(&mut self.bus)
                     }
                 }
 
@@ -198,9 +193,9 @@ impl EventHandler for NES {
         self.ppu
             .draw(ctx, [0.0, 0.0], (SCREEN_W - MARGIN, SCREEN_H))?;
         self.ppu
-            .draw_pattern_table(ctx, [SCREEN_W - MARGIN + 5.0, 500.0], 0, 1)?;
+            .draw_pattern_table(ctx, &self.bus, [SCREEN_W - MARGIN + 5.0, 500.0], 0, 1)?;
         self.ppu
-            .draw_pattern_table(ctx, [SCREEN_W - MARGIN + 150.0, 500.0], 1, 1)?;
+            .draw_pattern_table(ctx, &self.bus, [SCREEN_W - MARGIN + 150.0, 500.0], 1, 1)?;
         self.draw_cpu(ctx, [SCREEN_W - MARGIN + 5.0, 0.0])?;
         self.draw_code(ctx, [SCREEN_W - MARGIN + 5.0, 150.0])?;
         graphics::present(ctx)?;

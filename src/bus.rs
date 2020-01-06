@@ -1,5 +1,4 @@
-use super::cartridge::Cartridge;
-use super::ppu::*;
+use super::Cartridge;
 use num::PrimInt;
 
 pub struct Bus {

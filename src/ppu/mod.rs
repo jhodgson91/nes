@@ -1,25 +1,20 @@
 mod registers;
 pub use registers::*;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use image::RgbaImage;
 
-use ggez::graphics::{Color, DrawParam, Drawable, FilterMode, Image};
+use ggez::graphics::{DrawParam, Drawable, FilterMode, Image};
 use ggez::{Context, GameResult};
 
 use image::Rgba;
 
-use super::bus::Bus;
+use super::Bus;
 
 const SCREEN_WIDTH: u32 = 256;
 const SCREEN_HEIGHT: u32 = 240;
 
 pub struct PPU {
     screen: RgbaImage,
-
-    bus: Rc<RefCell<Bus>>,
 
     scanline: u32,
     cycle: u32,
@@ -91,23 +86,16 @@ impl PPU {
         res
     };
 
-    pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
+    pub fn new() -> Self {
         PPU {
             screen: RgbaImage::new(SCREEN_WIDTH, SCREEN_HEIGHT),
-            bus: bus,
 
             scanline: 0,
             cycle: 0,
         }
     }
 
-    pub fn get_color(&self, palette: u16, pixel: u16) -> Rgba<u8> {
-        // Retrieving a color requires the palette id, and a pixel number
-        let addr = 0x3f00 + (palette << 2) + pixel;
-        Self::COLORS[self.bus.borrow().ppu_read::<u8>(addr) as usize]
-    }
-
-    pub fn clock(&mut self) {
+    pub fn clock(&mut self, _: &mut Bus) {
         *self.screen.get_pixel_mut(self.cycle, self.scanline) = if rand::random() {
             image::Rgba([255, 255, 255, 255])
         } else {
@@ -142,6 +130,7 @@ impl PPU {
     pub fn draw_pattern_table(
         &mut self,
         ctx: &mut Context,
+        bus: &Bus,
         pos: [f32; 2],
         table: u8,
         palette: u16,
@@ -159,17 +148,23 @@ impl PPU {
                 // The first plan contains the lsb, the second the msb of the pixel
                 for row in 0..8 {
                     let addr: u16 = table as u16 * 0x1000 + offset + row;
-                    let lsb = self.bus.borrow().ppu_read::<u8>(addr + 0x0000) as u16;
-                    let msb = self.bus.borrow().ppu_read::<u8>(addr + 0x0008) as u16;
+                    let lsb = bus.ppu_read::<u8>(addr + 0x0000) as u16;
+                    let msb = bus.ppu_read::<u8>(addr + 0x0008) as u16;
                     for col in 0..8 {
                         let pixel = (lsb >> col) & 0x1 + (msb >> col) & 0x1;
                         *img.get_pixel_mut((tile_x * 8 + row) as u32, (tile_y * 8 + col) as u32) =
-                            self.get_color(palette, pixel as u16);
+                            self.read_color(palette, pixel as u16, bus);
                     }
                 }
             }
         }
 
         Image::from_rgba8(ctx, 128, 128, &*img)?.draw(ctx, DrawParam::new().dest(pos))
+    }
+
+    fn read_color(&self, palette: u16, pixel: u16, bus: &Bus) -> Rgba<u8> {
+        // Retrieving a color requires the palette id, and a pixel number
+        let addr = 0x3f00 + (palette << 2) + pixel;
+        Self::COLORS[bus.ppu_read::<u8>(addr) as usize]
     }
 }

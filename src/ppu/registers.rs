@@ -6,21 +6,21 @@ bitfield! {
     pub increment_mode, _: 2;
     pattern_sprite, _: 3;
     pattern_background, _: 4;
-    sprite_size, _: 5;
-    slave_mode, _: 6;
+    pub sprite_size, _: 5;
+    pub slave_mode, _: 6;
     pub generate_nmi, _: 7;
 }
 
 impl PPUCTRL {
-    fn nametable_addr(&self) -> u16 {
+    fn _nametable_addr(&self) -> u16 {
         0x2000 + self.nametable_id() * 0x400
     }
 
-    fn sprite_pattern_addr(&self) -> u16 {
+    fn _sprite_pattern_addr(&self) -> u16 {
         self.pattern_sprite() as u16 * 0x1000
     }
 
-    fn background_pattern_addr(&self) -> u16 {
+    fn _background_pattern_addr(&self) -> u16 {
         self.pattern_background() as u16 * 0x1000
     }
 }

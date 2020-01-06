@@ -9,9 +9,6 @@ pub use operation::Operation;
 
 use super::bus::Bus;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 type Interrupt = (u16, u8);
 
 bitflags::bitflags! {
@@ -65,8 +62,6 @@ pub struct CPU {
     pub cycles: u8,
 
     interrupt: Option<Interrupt>,
-
-    bus: Rc<RefCell<Bus>>,
 }
 
 impl CPU {
@@ -74,8 +69,7 @@ impl CPU {
     const RES: Interrupt = (0xfffc, 8);
     const IRQ: Interrupt = (0xfffe, 7);
 
-    pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
-        let pc = bus.borrow().cpu_read::<u16>(0xfffc);
+    pub fn new(pc: u16) -> Self {
         CPU {
             pc,
             x: 0,
@@ -91,8 +85,6 @@ impl CPU {
             interrupt: None,
 
             instruction: &Instruction::INVALID,
-
-            bus,
         }
     }
 
@@ -110,12 +102,12 @@ impl CPU {
         }
     }
 
-    pub fn clock(&mut self) {
+    pub fn clock(&mut self, bus: &mut Bus) {
         if self.cycles == 0 {
             match self.interrupt.take() {
                 // Reset behaves differently so prioritise that
                 Some(Self::RES) => {
-                    self.pc = self.bus.borrow().cpu_read(Self::RES.0);
+                    self.pc = bus.cpu_read(Self::RES.0);
 
                     self.a = 0;
                     self.x = 0;
@@ -133,15 +125,15 @@ impl CPU {
                     self.set_flag(Flags::U, true);
                     self.set_flag(Flags::B, false);
 
-                    self.push_state();
+                    self.push_state(bus);
 
                     self.set_flag(Flags::I, true);
 
-                    self.pc = self.bus.borrow().cpu_read::<u16>(interrupt.0);
+                    self.pc = bus.cpu_read::<u16>(interrupt.0);
                     self.cycles = interrupt.1;
                 }
                 _ => {
-                    let code = self.bus.borrow().cpu_read::<u8>(self.pc);
+                    let code = bus.cpu_read::<u8>(self.pc);
                     self.instruction = &Self::INSTRUCTIONS[code as usize];
                     self.cycles = self.instruction.cycles;
 
@@ -154,8 +146,8 @@ impl CPU {
 
                     self.pc += 1;
 
-                    (self.instruction.addr_mode.method())(self);
-                    (self.instruction.operation.method())(self);
+                    (self.instruction.addr_mode.method())(self, bus);
+                    (self.instruction.operation.method())(self, bus);
                 }
             }
         }
@@ -176,25 +168,25 @@ impl CPU {
     }
 
     /// Reads the operand according to address mode
-    fn read_oper(&self) -> u8 {
+    fn read_oper(&self, bus: &Bus) -> u8 {
         match self.instruction.addr_mode {
             AddressMode::ACC => self.a,
             AddressMode::IMM => self.oper as u8,
-            _ => self.bus.borrow().cpu_read(self.oper),
+            _ => bus.cpu_read(self.oper),
         }
     }
 
     /// Writes to the operand according to address mode
-    fn write_oper(&mut self, v: u8) {
+    fn write_oper(&mut self, bus: &mut Bus, v: u8) {
         match self.instruction.addr_mode {
             AddressMode::ACC => self.a = v,
             AddressMode::IMM => (),
-            _ => self.bus.borrow_mut().cpu_write(self.oper, v),
+            _ => bus.cpu_write(self.oper, v),
         }
     }
 
     /// invalid opcode found
-    fn xxx(&mut self) {
+    fn xxx(&mut self, _: &mut Bus) {
         panic!("Unsupported instruction!")
     }
 }

@@ -216,7 +216,8 @@ impl CPU {
 
         self.set_flag(Flags::I, true);
 
-        self.pc = self.bus.borrow_mut().cpu_read(0xfffe);
+        let bus = self.bus.borrow();
+        self.pc = (bus.cpu_read(0xfffe) as u16) << 8 | bus.cpu_read(0xffff) as u16;
     }
     //	branch on overflow clear
     fn bvc(&mut self) {
@@ -281,7 +282,7 @@ impl CPU {
     }
     //	increment
     fn inc(&mut self) {
-        let m = self.bus.borrow().cpu_read::<u8>(self.oper).wrapping_add(1);
+        let m = self.bus.borrow().cpu_read(self.oper).wrapping_add(1);
         self.set_flag(Flags::Z, m == 0);
         self.set_flag(Flags::N, m & 1 << 7 != 0);
         self.write_oper(m);
@@ -304,17 +305,27 @@ impl CPU {
     }
     //	jump subroutine
     fn jsr(&mut self) {
+        let bus = self.bus.borrow_mut();
+
+        bus.cpu_write(self.stack_addr(), (self.pc >> 8) as u8);
         self.sp = self.sp.wrapping_sub(1);
-        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.pc);
+        bus.cpu_write(self.stack_addr(), self.pc as u8);
         self.sp = self.sp.wrapping_sub(1);
 
         self.pc = self.oper;
     }
     //	return from subroutine
     fn rts(&mut self) {
-        self.sp = self.sp.wrapping_add(1);
-        self.pc = self.bus.borrow().cpu_read::<u16>(self.stack_addr());
-        self.sp = self.sp.wrapping_add(1);
+        let bus = self.bus.borrow();
+
+        self.pc = {
+            let lo = bus.cpu_read(self.stack_addr()) as u16;
+            self.sp = self.sp.wrapping_add(1);
+            let hi = (bus.cpu_read(self.stack_addr()) as u16) << 8;
+            self.sp = self.sp.wrapping_add(1);
+
+            hi | lo
+        }
     }
     //	load accumulator
     fn lda(&mut self) {

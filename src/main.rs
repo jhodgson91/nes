@@ -73,7 +73,7 @@ impl NES {
             s += &format!("${:04X}:  ", addr);
 
             for _ in 0..cols {
-                s += &format!("{:02X} ", bus.cpu_read::<u8>(addr));
+                s += &format!("{:02X} ", bus.cpu_read(addr));
                 addr += 1;
             }
             s += "\n";

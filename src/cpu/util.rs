@@ -6,11 +6,17 @@ impl CPU {
         let bus = self.bus.borrow();
         let mut res = Vec::new();
 
+        let read_u16 = |addr| {
+            let lo = bus.cpu_read(addr) as u16;
+            let hi = (bus.cpu_read(addr) as u16) << 8;
+            lo | hi
+        };
+
         while pc < to as u32 {
             let line_addr = pc as u16;
 
             let mut s = format!("${:04X}: ", pc);
-            let instruction = Self::INSTRUCTIONS[bus.cpu_read::<u8>(pc as u16) as usize];
+            let instruction = Self::INSTRUCTIONS[bus.cpu_read(pc as u16) as usize];
             pc += 1;
 
             if ((to - instruction.addr_mode.operand_size() as u16) as u32) < pc {
@@ -21,36 +27,36 @@ impl CPU {
             match instruction.addr_mode {
                 AddressMode::ACC => (),
                 AddressMode::AB0 => {
-                    s += &format!("${:04X} ", bus.cpu_read::<u16>(pc as u16));
+                    s += &format!("${:04X} ", read_u16(pc as u16));
                     pc += 2;
                 }
                 AddressMode::ABX => {
-                    s += &format!("${:04X},X", bus.cpu_read::<u16>(pc as u16));
+                    s += &format!("${:04X},X", read_u16(pc as u16));
                     pc += 2;
                 }
                 AddressMode::ABY => {
-                    s += &format!("${:04X},Y", bus.cpu_read::<u16>(pc as u16));
+                    s += &format!("${:04X},Y", read_u16(pc as u16));
                     pc += 2;
                 }
                 AddressMode::IMM => {
-                    s += &format!("#${:02X}", bus.cpu_read::<u8>(pc as u16));
+                    s += &format!("#${:02X}", bus.cpu_read(pc as u16));
                     pc += 1;
                 }
                 AddressMode::IMP => (),
                 AddressMode::ID0 => {
-                    s += &format!("(${:04X})", bus.cpu_read::<u16>(pc as u16));
+                    s += &format!("(${:04X})", read_u16(pc as u16));
                     pc += 2;
                 }
                 AddressMode::IDX => {
-                    s += &format!("(${:02X},X)", bus.cpu_read::<u8>(pc as u16));
+                    s += &format!("(${:02X},X)", bus.cpu_read(pc as u16));
                     pc += 1;
                 }
                 AddressMode::IDY => {
-                    s += &format!("(${:02X}),Y", bus.cpu_read::<u8>(pc as u16));
+                    s += &format!("(${:02X}),Y", bus.cpu_read(pc as u16));
                     pc += 1;
                 }
                 AddressMode::REL => {
-                    let oper = bus.cpu_read::<u8>(pc as u16) as u16;
+                    let oper = bus.cpu_read(pc as u16) as u16;
                     let dest = (pc as u16).wrapping_add(if oper & 1 << 7 != 0 {
                         oper | 0xff00
                     } else {
@@ -62,15 +68,15 @@ impl CPU {
                     pc += 1;
                 }
                 AddressMode::ZP0 => {
-                    s += &format!("${:02X}", bus.cpu_read::<u8>(pc as u16));
+                    s += &format!("${:02X}", bus.cpu_read(pc as u16));
                     pc += 1;
                 }
                 AddressMode::ZPX => {
-                    s += &format!("${:02X},X", bus.cpu_read::<u8>(pc as u16));
+                    s += &format!("${:02X},X", bus.cpu_read(pc as u16));
                     pc += 1;
                 }
                 AddressMode::ZPY => {
-                    s += &format!("${:02X},Y", bus.cpu_read::<u8>(pc as u16));
+                    s += &format!("${:02X},Y", bus.cpu_read(pc as u16));
                     pc += 1;
                 }
                 AddressMode::XXX => (),
@@ -104,23 +110,30 @@ impl CPU {
     }
 
     pub(super) fn push_state(&mut self) {
-        // PC should be written to the sp and one before, so dec first, then write u16, then dec
+        let bus = self.bus.borrow_mut();
+
+        bus.cpu_write(self.stack_addr(), (self.pc >> 8) as u8);
         self.sp = self.sp.wrapping_sub(1);
-        self.bus.borrow_mut().cpu_write(self.stack_addr(), self.pc);
+        bus.cpu_write(self.stack_addr(), self.pc as u8);
         self.sp = self.sp.wrapping_sub(1);
 
-        self.bus
-            .borrow_mut()
-            .cpu_write(self.stack_addr(), self.st.bits());
+        bus.cpu_write(self.stack_addr(), self.st.bits());
         self.sp = self.sp.wrapping_sub(1);
     }
 
     pub(super) fn pop_state(&mut self) {
+        let bus = self.bus.borrow();
+
         self.sp = self.sp.wrapping_add(1);
         self.st = Flags::from_bits(self.bus.borrow_mut().cpu_read(self.stack_addr())).unwrap();
 
-        self.sp = self.sp.wrapping_add(1);
-        self.pc = self.bus.borrow().cpu_read(self.stack_addr());
-        self.sp = self.sp.wrapping_add(1);
+        self.pc = {
+            let lo = bus.cpu_read(self.stack_addr()) as u16;
+            self.sp = self.sp.wrapping_add(1);
+            let hi = (bus.cpu_read(self.stack_addr()) as u16) << 8;
+            self.sp = self.sp.wrapping_add(1);
+
+            hi | lo
+        }
     }
 }

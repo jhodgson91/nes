@@ -75,9 +75,9 @@ impl CPU {
     const IRQ: Interrupt = (0xfffe, 7);
 
     pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
-        let pc = bus.borrow().cpu_read::<u16>(0xfffc);
+        let b = bus.borrow();
         CPU {
-            pc,
+            pc: (b.cpu_read(0xfffc) as u16) << 8 | b.cpu_read(0xfffd) as u16,
             x: 0,
             y: 0,
             a: 0,
@@ -141,7 +141,7 @@ impl CPU {
                     self.cycles = interrupt.1;
                 }
                 _ => {
-                    let code = self.bus.borrow().cpu_read::<u8>(self.pc);
+                    let code = self.bus.borrow().cpu_read(self.pc);
                     self.instruction = &Self::INSTRUCTIONS[code as usize];
                     self.cycles = self.instruction.cycles;
 

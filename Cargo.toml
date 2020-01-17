@@ -8,9 +8,13 @@ edition = "2018"
 
 [dependencies]
 paste = "0.1.6"
-num = "0.2.0"
+num = "0.2.1"
 ggez = "0.5.1"
 bitfield = "0.13.2"
 bitflags = "1.2.1"
-image = "0.22.3"
-rand = "0.7.2"
+image = "0.22.4"
+rand = "0.7.3"
+
+[[bin]]
+name = "new_bus"
+path = "src/new_bus.rs"

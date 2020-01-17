@@ -14,17 +14,17 @@ bitfield! {
     u16, prg_size_lsb, _: 39, 32;
     u16, chr_size_lsb, _: 47, 40;
 
-    pub mirror_mode, _: 48;
+    pub u8, mirror_mode, _: 48, 48;
     pub has_battery_mem, _: 89;
     pub has_trainer, _: 50;
     pub four_screen_mode, _: 51;
-    pub mapper1, _: 55 ,52;
+    pub u16, mapper1, _: 55 ,52;
 
     pub console_type, _: 57, 56;
     pub id_num, _: 59, 58;
-    pub mapper2, _: 63, 60;
+    pub u16, mapper2, _: 63, 60;
 
-    pub mapper3, _: 68, 65;
+    pub u16, mapper3, _: 68, 65;
 
     pub sub_mapper, _: 72,69;
 
@@ -33,6 +33,10 @@ bitfield! {
 }
 
 impl<T: AsMut<[u8]> + AsRef<[u8]>> Header<T> {
+    pub fn mapper_number(&self) -> u16 {
+        self.mapper1() << 4 | self.mapper2() << 8 | self.mapper3() << 12
+    }
+
     pub fn prg_size(&self) -> usize {
         Self::parse_size(self.prg_size_msb() << 8 | self.prg_size_lsb())
     }

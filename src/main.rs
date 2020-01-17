@@ -42,7 +42,7 @@ struct NES {
 impl NES {
     fn new<P: AsRef<Path>>(rom_path: P) -> std::io::Result<Self> {
         let cartridge = Cartridge::from_nes(File::open(rom_path)?)?;
-        let bus = Bus::new(cartridge);
+        let bus = Bus::from_cartridge(cartridge);
         let cpu = CPU::new(bus.cpu_read::<u16>(0xfffc));
 
         Ok(NES {
@@ -243,7 +243,7 @@ impl EventHandler for NES {
 use ggez::conf::WindowMode;
 
 fn main() -> std::io::Result<()> {
-    let mut nes = NES::new("/home/james/Projects/rust/nes/roms/nestest.nes")?;
+    let mut nes = NES::new("E:\\rust\\nes\\roms\\nestest.nes")?;
     let (mut ctx, mut event_loop) = ContextBuilder::new("NES", "jhodgson")
         .window_mode(WindowMode {
             width: SCREEN_W,

@@ -22,10 +22,12 @@ pub struct NES {
 
     run_state: RunState,
     disassembly: Vec<(u16, String)>,
+
+    debug_ui: DebugUI,
 }
 
 impl NES {
-    pub fn new<P: AsRef<Path>>(rom_path: P) -> std::io::Result<Self> {
+    pub fn new<P: AsRef<Path>>(rom_path: P, ctx: &mut Context) -> std::io::Result<Self> {
         let cartridge = Cartridge::from_nes(File::open(rom_path)?)?;
         let bus = Bus::from_cartridge(cartridge);
         let cpu = CPU::new(bus.cpu_read::<u16>(0xfffc));
@@ -36,6 +38,7 @@ impl NES {
             cpu: cpu,
             bus: bus,
             run_state: RunState::Break,
+            debug_ui: DebugUI::new(ctx),
         })
     }
 
@@ -177,12 +180,16 @@ impl EventHandler for NES {
 
         self.ppu
             .draw(ctx, [0.0, 0.0], (SCREEN_W - MARGIN, SCREEN_H))?;
-        self.ppu
+        /*
+            self.ppu
             .draw_pattern_table(ctx, &self.bus, [SCREEN_W - MARGIN + 5.0, 500.0], 0, 1)?;
         self.ppu
             .draw_pattern_table(ctx, &self.bus, [SCREEN_W - MARGIN + 150.0, 500.0], 1, 1)?;
         self.draw_cpu(ctx, [SCREEN_W - MARGIN + 5.0, 0.0])?;
         self.draw_code(ctx, [SCREEN_W - MARGIN + 5.0, 150.0])?;
+        */
+
+        self.debug_ui.render(ctx);
         graphics::present(ctx)?;
         Ok(())
     }
@@ -222,5 +229,30 @@ impl EventHandler for NES {
             KeyCode::C => self.run_state = RunState::Run,
             _ => (),
         };
+    }
+    fn mouse_button_down_event(
+        &mut self,
+        _ctx: &mut Context,
+        button: event::MouseButton,
+        _x: f32,
+        _y: f32,
+    ) {
+        self.debug_ui.update_mouse_down((
+            button == event::MouseButton::Left,
+            button == event::MouseButton::Right,
+            button == event::MouseButton::Middle,
+        ));
+    }
+    fn mouse_button_up_event(
+        &mut self,
+        _ctx: &mut Context,
+        _button: event::MouseButton,
+        _x: f32,
+        _y: f32,
+    ) {
+        self.debug_ui.update_mouse_down((false, false, false))
+    }
+    fn mouse_motion_event(&mut self, _ctx: &mut Context, x: f32, y: f32, _dx: f32, _dy: f32) {
+        self.debug_ui.update_mouse_pos(x, y)
     }
 }

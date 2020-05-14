@@ -27,20 +27,20 @@ pub struct NES {
 impl NES {
     pub fn new<P: AsRef<Path>>(rom_path: P) -> std::io::Result<Self> {
         let cartridge = Cartridge::from_nes(File::open(rom_path)?)?;
-        let bus = Bus::from_cartridge(cartridge);
+        let mut bus = Bus::from_cartridge(cartridge);
         let cpu = CPU::new(bus.cpu_read::<u16>(0xfffc));
 
         Ok(NES {
-            disassembly: cpu.disassemble(0x0000, 0xffff, &bus),
+            disassembly: cpu.disassemble(0x8000, 0xffff, &mut bus),
             ppu: PPU::new(),
-            cpu: cpu,
-            bus: bus,
+            cpu,
+            bus,
             run_state: RunState::Break,
         })
     }
 
     fn _draw_bus(
-        &self,
+        &mut self,
         ctx: &mut Context,
         mut addr: u16,
         rows: usize,
@@ -178,9 +178,14 @@ impl EventHandler for NES {
         self.ppu
             .draw(ctx, [0.0, 0.0], (SCREEN_W - MARGIN, SCREEN_H))?;
         self.ppu
-            .draw_pattern_table(ctx, &self.bus, [SCREEN_W - MARGIN + 5.0, 500.0], 0, 1)?;
-        self.ppu
-            .draw_pattern_table(ctx, &self.bus, [SCREEN_W - MARGIN + 150.0, 500.0], 1, 1)?;
+            .draw_pattern_table(ctx, &mut self.bus, [SCREEN_W - MARGIN + 5.0, 500.0], 0, 1)?;
+        self.ppu.draw_pattern_table(
+            ctx,
+            &mut self.bus,
+            [SCREEN_W - MARGIN + 150.0, 500.0],
+            1,
+            1,
+        )?;
         self.draw_cpu(ctx, [SCREEN_W - MARGIN + 5.0, 0.0])?;
         self.draw_code(ctx, [SCREEN_W - MARGIN + 5.0, 150.0])?;
         graphics::present(ctx)?;

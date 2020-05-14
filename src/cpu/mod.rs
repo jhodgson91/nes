@@ -168,7 +168,7 @@ impl CPU {
     }
 
     /// Reads the operand according to address mode
-    fn read_oper(&self, bus: &Bus) -> u8 {
+    fn read_oper(&self, bus: &mut Bus) -> u8 {
         match self.instruction.addr_mode {
             AddressMode::ACC => self.a,
             AddressMode::IMM => self.oper as u8,

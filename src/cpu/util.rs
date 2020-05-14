@@ -2,7 +2,7 @@ use super::AddressMode;
 use super::{Bus, Flags, CPU};
 
 impl CPU {
-    pub fn disassemble(&self, mut pc: u32, to: u16, bus: &Bus) -> Vec<(u16, String)> {
+    pub fn disassemble(&self, mut pc: u32, to: u16, bus: &mut Bus) -> Vec<(u16, String)> {
         let mut res = Vec::new();
 
         while pc < to as u32 {
@@ -112,7 +112,7 @@ impl CPU {
         self.sp = self.sp.wrapping_sub(1);
     }
 
-    pub(super) fn pop_state(&mut self, bus: &Bus) {
+    pub(super) fn pop_state(&mut self, bus: &mut Bus) {
         self.sp = self.sp.wrapping_add(1);
         self.st = Flags::from_bits(bus.cpu_read(self.stack_addr())).unwrap();
 

@@ -130,7 +130,7 @@ impl PPU {
     pub fn draw_pattern_table(
         &mut self,
         ctx: &mut Context,
-        bus: &Bus,
+        bus: &mut Bus,
         pos: [f32; 2],
         table: u8,
         palette: u16,
@@ -162,7 +162,7 @@ impl PPU {
         Image::from_rgba8(ctx, 128, 128, &*img)?.draw(ctx, DrawParam::new().dest(pos))
     }
 
-    fn read_color(&self, palette: u16, pixel: u16, bus: &Bus) -> Rgba<u8> {
+    fn read_color(&self, palette: u16, pixel: u16, bus: &mut Bus) -> Rgba<u8> {
         // Retrieving a color requires the palette id, and a pixel number
         let addr = 0x3f00 + (palette << 2) + pixel;
         Self::COLORS[bus.ppu_read::<u8>(addr) as usize]

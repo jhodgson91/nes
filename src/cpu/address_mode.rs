@@ -117,7 +117,8 @@ impl CPU {
     fn imp(&mut self, _: &mut Bus) {}
     //....	indirect	 	        OPC ($LLHH)	 	operand is address; effective address is contents of word at address: C.w($HHLL)
     fn id0(&mut self, bus: &mut Bus) {
-        self.oper = bus.cpu_read(bus.cpu_read::<u16>(self.pc));
+        let addr = bus.cpu_read::<u16>(self.pc);
+        self.oper = bus.cpu_read(addr);
         self.pc += 2;
     }
     //....	X-indexed, indirect	 	OPC ($LL,X)	 	operand is zeropage address; effective address is word in (LL + X, LL + X + 1), inc. without carry: C.w($00LL + X)
